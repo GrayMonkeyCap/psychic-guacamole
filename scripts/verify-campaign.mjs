@@ -1,0 +1,60 @@
+// Isolated browser checks: existing player progress is never modified.
+import { createRequire } from 'node:module';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { CHAPTERS, runChapter } from '../src/levelModel.js';
+const require = createRequire(path.join(process.argv[2], 'package.json'));
+const { chromium } = require('playwright');
+const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
+const page = await context.newPage();
+const errors = [];
+page.on('pageerror', e => errors.push(e.message));
+await page.goto('http://127.0.0.1:5173/');
+await page.getByRole('button', { name: 'Play your first level' }).waitFor();
+assert.equal(await page.getByText('LOCKED', { exact: true }).count(), 0);
+await page.screenshot({ path: 'artifacts/campaign-new-desktop.png', fullPage: true });
+await page.getByRole('link', { name: 'Show me how', exact: true }).click();
+assert.ok(await page.getByRole('heading', { name: 'Your next “oh, that’s why.”' }).isVisible());
+await page.getByRole('button', { name: 'Play your first level' }).click();
+await page.getByRole('button', { name: 'Let’s build a link' }).click();
+await page.getByRole('button', { name: 'Add API server', exact: true }).click();
+await page.getByRole('button', { name: 'SYSTEM SANDBOX / 01 The little link' }).click();
+await page.getByRole('button', { name: 'Continue building', exact: true }).waitFor();
+assert.ok((await page.locator('.hub-play-note').innerText()).includes('1 components'));
+await page.getByRole('button', { name: 'Revisit the introduction' }).click();
+await page.getByRole('button', { name: 'Let’s build a link' }).click();
+assert.equal(await page.getByRole('button', { name: 'Inspect API server', exact: true }).count(), 1);
+await page.getByRole('button', { name: 'SYSTEM SANDBOX / 01 The little link' }).click();
+await page.getByRole('button', { name: 'Continue building', exact: true }).click();
+assert.equal(await page.getByRole('dialog').count(), 0);
+await page.getByRole('button', { name: 'SYSTEM SANDBOX / 01 The little link' }).click();
+const design = { nodes: [{ id: 'internet', type: 'internet', tier: 0, x: 7, y: 43 }, { id: 'api', type: 'api', tier: 1, strategy: 'random', x: 37, y: 43 }, { id: 'db', type: 'database', tier: 1, x: 69, y: 43 }, { id: 'cache', type: 'cache', tier: 0, x: 69, y: 12 }], edges: [{ id: '1', from: 'internet', to: 'api' }, { id: '2', from: 'api', to: 'db' }, { id: '3', from: 'api', to: 'cache' }] };
+const history = CHAPTERS.map(c => { const { frames, ...summary } = runChapter(design, c); return summary; });
+await page.evaluate(save => localStorage.setItem('system-sandbox:first-level:v2', JSON.stringify(save)), { version: 2, design, history, chapter: 2, unlocked: 2 });
+await page.reload();
+await page.getByRole('button', { name: 'Return to your system', exact: true }).waitFor();
+assert.equal(await page.locator('.hub-milestones .earned').count(), 3);
+assert.ok((await page.locator('.hub-save-stats').innerText()).includes('$540'));
+await page.screenshot({ path: 'artifacts/campaign-returning-desktop.png', fullPage: true });
+for (const width of [1024, 768, 390, 320]) {
+  await page.setViewportSize({ width, height: 900 });
+  await page.screenshot({ path: `artifacts/campaign-${width}.png`, fullPage: true });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `no overflow at ${width}px`);
+}
+// Editing changes the architecture signature; old passes must not certify the new design.
+await page.evaluate(() => {
+  const save = JSON.parse(localStorage.getItem('system-sandbox:first-level:v2'));
+  save.design.nodes.find(n => n.type === 'api').tier = 0;
+  localStorage.setItem('system-sandbox:first-level:v2', JSON.stringify(save));
+});
+await page.reload();
+await page.getByRole('button', { name: 'Continue building', exact: true }).waitFor();
+assert.equal(await page.locator('.hub-challenge-path .done').count(), 0);
+assert.equal(await page.locator('.hub-milestones .earned').count(), 1);
+await page.evaluate(() => localStorage.setItem('system-sandbox:first-level:v2', '{invalid'));
+await page.reload();
+await page.getByRole('button', { name: 'Play your first level', exact: true }).waitFor();
+assert.deepEqual(errors, []);
+console.log('Campaign QA passed: new player, anchors, resume, tutorial replay without losing the board, current-design certification, saved preview, corrupt save, 4 responsive widths.');
+await browser.close();
