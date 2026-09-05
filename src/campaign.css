@@ -168,3 +168,8 @@
 .hub-header nav a { font-size: 12px; }
 .hub-future p { font-size: 12px; }
 .hub-footer > span:last-child { font-size: 10px; }
+@media (max-width: 500px) {
+  .hub-tutorial-button { min-width: 0; width: 100%; }
+  .hub-preview-top > span:last-child { display: none; }
+  .hub-preview-sticker { top: -10px; }
+}

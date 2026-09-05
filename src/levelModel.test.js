@@ -129,7 +129,7 @@ describe('first level: solution space and fair replay', () => {
   });
   it('reports are deterministic and certifications ignore layout but track behavioral changes', () => {
     const d = cached();
-    expect(runChapter(d, CHAPTERS[1]).p99).toBe(runChapter(d, CHAPTERS[1]).p99);
+    expect(runChapter(d, CHAPTERS[1]).estimatedLatencyMs).toBe(runChapter(d, CHAPTERS[1]).estimatedLatencyMs);
     expect(fingerprint({ ...d, nodes: d.nodes.map(n => ({ ...n, x: 10 })) })).toBe(fingerprint(d));
     expect(fingerprint(basic(1))).not.toBe(fingerprint(basic(2)));
   });

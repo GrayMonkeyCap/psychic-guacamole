@@ -1,6 +1,12 @@
 // Deliberately small, deterministic teaching model. Capacities and costs are game units.
 export const LIMIT = 900;
 export const EFFICIENCY_TARGET = 650;
+// Bump when simulation/validation semantics change, not for presentation-only edits.
+export const MODEL_VERSION = 'aggregate-v1';
+export const SAVE_VERSION = 3;
+// Keep the existing storage key so an upgrade finds the player's board.
+export const SAVE_KEY = 'system-sandbox:first-level:v2';
+export const CONTRACT_RULES = { maxError: 2, maxLatencyMs: 300, budget: LIMIT };
 export const CATALOG = {
   api: { name: 'API server', short: 'API', color: '#9781ca', verb: 'Runs your link logic',
     role: 'Receives a URL to shorten, or looks up the destination of a short code. It calls other services and returns the answer.',
@@ -56,6 +62,37 @@ export const CHAPTERS = [
     takeaway: 'Reads and writes stress different resources. Code generation is a strategy; durability still needs database capacity.' },
 ];
 export const EMPTY_DESIGN = { nodes: [{ id: 'internet', type: 'internet', x: 7, y: 43, tier: 0 }], edges: [] };
+export function scenarioVersion(chapter) {
+  return JSON.stringify([chapter.id, chapter.peak, chapter.reads, chapter.hot, chapter.duration, CONTRACT_RULES]);
+}
+// Frozen migration identifiers: NEVER derive these from future rules or chapters.
+const LEGACY_MODEL_VERSION = 'aggregate-v1';
+const LEGACY_SCENARIOS = [
+  '[0,100,0.8,0.15,12,{"maxError":2,"maxLatencyMs":300,"budget":900}]',
+  '[1,2400,0.98,0.92,16,{"maxError":2,"maxLatencyMs":300,"budget":900}]',
+  '[2,1400,0.15,0.2,16,{"maxError":2,"maxLatencyMs":300,"budget":900}]',
+];
+export function meetsMetricContract({ maxError, estimatedLatencyMs, cost }) {
+  return Number.isFinite(maxError) && maxError >= 0 && maxError <= CONTRACT_RULES.maxError
+    && Number.isFinite(estimatedLatencyMs) && estimatedLatencyMs >= 0 && estimatedLatencyMs <= CONTRACT_RULES.maxLatencyMs
+    && Number.isFinite(cost) && cost >= 0 && cost <= CONTRACT_RULES.budget;
+}
+export function isCurrentResult(result, chapter = CHAPTERS[result?.chapter]) {
+  return Boolean(chapter && result?.chapter === chapter.id && result.modelVersion === MODEL_VERSION && result.scenarioVersion === scenarioVersion(chapter));
+}
+export function passedChapters(certificates, design) {
+  const signature = fingerprint(design);
+  return CHAPTERS.map(chapter => certificates.some(c => c.passed === true && meetsMetricContract(c)
+    && c.fingerprint === signature && isCurrentResult(c, chapter)));
+}
+export function recordCertificate(certificates, result) {
+  if (result?.passed !== true || !meetsMetricContract(result) || typeof result.fingerprint !== 'string'
+    || typeof result.modelVersion !== 'string' || typeof result.scenarioVersion !== 'string') return certificates;
+  const key = c => JSON.stringify([c.chapter, c.fingerprint, c.modelVersion, c.scenarioVersion]);
+  const certificate = { chapter: result.chapter, fingerprint: result.fingerprint, modelVersion: result.modelVersion,
+    scenarioVersion: result.scenarioVersion, passed: true, cost: result.cost, maxError: result.maxError, estimatedLatencyMs: result.estimatedLatencyMs };
+  return [...certificates.filter(c => key(c) !== key(certificate)), certificate];
+}
 export function costOf(nodes) { return nodes.reduce((n, node) => n + (CATALOG[node.type]?.tiers[node.tier]?.cost || 0), 0); }
 export function fingerprint(design) {
   return JSON.stringify({ nodes: design.nodes.map(({ id, type, tier, strategy }) => ({ id, type, tier, strategy: type === 'api' ? strategy || 'sequence' : undefined })).sort((a, b) => a.id.localeCompare(b.id)), edges: design.edges.map(e => `${e.from}>${e.to}`).sort() });
@@ -182,12 +219,12 @@ export function tick(design, chapter, time, previous = {}, dt = .2) {
     latencies.push({ latency: 18 + resources.reduce((n, l) => n + l.latency, 0), rate: path.rate });
   }
   latencies.sort((a, b) => a.latency - b.latency);
-  let cumulative = 0, p99 = 0;
-  for (const sample of latencies) { cumulative += sample.rate; p99 = sample.latency; if (cumulative >= rps * .99) break; }
+  let cumulative = 0, estimatedLatencyMs = 0;
+  for (const sample of latencies) { cumulative += sample.rate; estimatedLatencyMs = sample.latency; if (cumulative >= rps * .99) break; }
   const hottest = Object.entries(loads).sort((a, b) => b[1].ratio - a[1].ratio)[0];
   const errorRate = validation.valid ? Math.max(0, Math.min(100, 100 * (1 - successes / Math.max(1, rps)))) : 100;
   const cacheHits = Object.values(loads).reduce((sum, l) => sum + l.hits, 0);
-  return { time, rps, reads, writes, loads, edges, warmth, p99: Math.round(p99), errorRate,
+  return { time, rps, reads, writes, loads, edges, warmth, estimatedLatencyMs: Math.round(estimatedLatencyMs), errorRate,
     cacheHit: reads ? cacheHits / reads * 100 : 0, hottest: hottest?.[0], validation };
 }
 export function runChapter(design, chapter) {
@@ -197,15 +234,15 @@ export function runChapter(design, chapter) {
   return report(design, chapter, frames);
 }
 export function report(design, chapter, frames) {
-  const worst = frames.reduce((a, b) => b.errorRate + b.p99 / 100 > a.errorRate + a.p99 / 100 ? b : a, frames[0]);
-  const maxError = Math.max(...frames.map(f => f.errorRate)), p99 = Math.max(...frames.map(f => f.p99));
+  const worst = frames.reduce((a, b) => b.errorRate + b.estimatedLatencyMs / 100 > a.errorRate + a.estimatedLatencyMs / 100 ? b : a, frames[0]);
+  const maxError = Math.max(...frames.map(f => f.errorRate)), estimatedLatencyMs = Math.max(...frames.map(f => f.estimatedLatencyMs));
   const cost = costOf(design.nodes), valid = validate(design).valid;
-  const passed = valid && cost <= LIMIT && maxError <= 2 && p99 <= 300;
+  const passed = valid && meetsMetricContract({ cost, maxError, estimatedLatencyMs });
   const bottleneck = design.nodes.find(n => n.id === worst?.hottest);
   const load = worst?.loads?.[bottleneck?.id];
   const reason = !valid ? validate(design).issues[0].text : cost > LIMIT ? `The design works outside the contract: $${cost} exceeds the $${LIMIT} monthly budget.` : !passed && bottleneck ? `${CATALOG[bottleneck.type].name} reached ${Math.round(load.ratio * 100)}% of its capacity. ${Math.round(load.reads).toLocaleString()} read and ${Math.round(load.writes).toLocaleString()} write operations per second competed for its resources.` : chapter.takeaway;
   const alternatives = bottleneck?.type === 'database' ? chapter.id === 1 ? 'Try reusing popular reads with a cache, or give storage more capacity. Check whether the API also needs room.' : 'Compare database capacity and the API’s code strategy. Caching does not remove durable writes.' : bottleneck?.type === 'api' ? 'Compare a larger API, replicas behind a balancer, or an edge cache that answers before the API.' : 'Inspect the highlighted component and its dependencies. More capacity and a different request path have different costs.';
-  return { chapter: chapter.id, passed, p99, maxError, cost, reason, alternatives, bottleneck: bottleneck?.id, frames, fingerprint: fingerprint(design) };
+  return { chapter: chapter.id, passed, estimatedLatencyMs, maxError, cost, reason, alternatives, bottleneck: bottleneck?.id, frames, fingerprint: fingerprint(design), modelVersion: MODEL_VERSION, scenarioVersion: scenarioVersion(chapter) };
 }
 export function traceRequest(design, kind = 'read', hot = false) {
   const validation = validate(design);
@@ -250,12 +287,31 @@ export function traceRequest(design, kind = 'read', hot = false) {
 export function restoreSave(raw) {
   try {
     const save = JSON.parse(raw);
-    if (save?.version !== 2 || !Array.isArray(save.design?.nodes) || !Array.isArray(save.design?.edges)) return null;
+    if (![2, SAVE_VERSION].includes(save?.version) || !Array.isArray(save.design?.nodes) || !Array.isArray(save.design?.edges)) return null;
     const { nodes, edges } = save.design;
     if (nodes.length > 40 || edges.length > 100 || nodes.filter(n => n.id === 'internet' && n.type === 'internet').length !== 1 || new Set(nodes.map(n => n.id)).size !== nodes.length) return null;
     if (!nodes.every(n => typeof n.id === 'string' && Number.isFinite(n.x) && n.x >= 0 && n.x <= 85 && Number.isFinite(n.y) && n.y >= 0 && n.y <= 82 && (n.type === 'internet' ? n.id === 'internet' : CATALOG[n.type]?.tiers[n.tier] && Number.isInteger(n.tier)) && (n.type !== 'api' || STRATEGIES[n.strategy || 'sequence']))) return null;
     if (!edges.every(e => typeof e.id === 'string' && nodes.some(n => n.id === e.from) && nodes.some(n => n.id === e.to))) return null;
     const unlocked = Math.max(0, Math.min(2, Math.floor(Number(save.unlocked) || 0)));
-    return { design: save.design, unlocked, chapter: Math.max(0, Math.min(unlocked, Math.floor(Number(save.chapter) || 0))), guided: save.guided !== false, history: Array.isArray(save.history) ? save.history.filter(r => r && Number.isInteger(r.chapter) && r.chapter >= 0 && r.chapter <= 2 && Number.isFinite(r.cost) && Number.isFinite(r.p99) && Number.isFinite(r.maxError) && typeof r.fingerprint === 'string').slice(-12) : [] };
+    const normalize = r => {
+      if (!r || !Number.isInteger(r.chapter) || !CHAPTERS[r.chapter] || typeof r.passed !== 'boolean'
+        || !Number.isFinite(r.cost) || r.cost < 0 || !Number.isFinite(r.maxError) || r.maxError < 0 || r.maxError > 100
+        || typeof r.fingerprint !== 'string' || r.fingerprint.length > 40000) return null;
+      const estimatedLatencyMs = r.estimatedLatencyMs ?? (save.version === 2 ? r.p99 : undefined);
+      if (!Number.isFinite(estimatedLatencyMs) || estimatedLatencyMs < 0) return null;
+      const legacy = save.version === 2 && r.modelVersion == null && r.scenarioVersion == null;
+      const modelVersion = legacy ? LEGACY_MODEL_VERSION : r.modelVersion;
+      const scenario = legacy ? LEGACY_SCENARIOS[r.chapter] : r.scenarioVersion;
+      if (typeof modelVersion !== 'string' || typeof scenario !== 'string' || modelVersion.length > 100 || scenario.length > 1000) return null;
+      return { chapter: r.chapter, passed: r.passed, fingerprint: r.fingerprint, cost: r.cost, maxError: r.maxError,
+        estimatedLatencyMs, modelVersion, scenarioVersion: scenario };
+    };
+    const allHistory = (Array.isArray(save.history) ? save.history : []).map(normalize).filter(Boolean);
+    const history = allHistory.slice(-12);
+    // Only v2 needs history migration. v3's durable ledger is independent of recent attempts.
+    const candidates = save.version === 2 ? allHistory : (Array.isArray(save.certificates) ? save.certificates : []).map(normalize).filter(Boolean);
+    const certificates = candidates.reduce(recordCertificate, []);
+    return { version: SAVE_VERSION, design: save.design, unlocked,
+      chapter: Math.max(0, Math.min(unlocked, Math.floor(Number(save.chapter) || 0))), guided: save.guided !== false, history, certificates };
   } catch { return null; }
 }

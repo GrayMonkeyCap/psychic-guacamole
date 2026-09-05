@@ -1,5 +1,7 @@
 # The little link: first-level redesign
 
+**Implementation update, 5 September 2026:** The original rationale below describes the initial redesign. The follow-up trust slice renames the path-based “estimated p99” to **estimated latency** and separates versioned certificates from recent history. See the [current model/progress contract](level-1-model-contract.md) for exact semantics, migration behavior and remaining limitations.
+
 ## Product judgment
 
 The strongest version of this idea is a system-design puzzle with observable consequences. The player constructs an explanation of how a request succeeds, tests it under pressure, then revises that explanation. The game should reward identifying unnecessary work, locating bottlenecks, and choosing tradeoffs. A diagram that merely turns green when prescribed boxes are present cannot deliver that experience.

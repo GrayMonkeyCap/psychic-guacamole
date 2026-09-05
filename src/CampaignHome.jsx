@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Activity, ArrowDown, ArrowRight, BookOpen, Check, ChevronRight, Cloud, Code2, Database, GitFork, Link2, MessageCircle, MousePointer2, Play, RadioTower, RefreshCw, Server, ShieldCheck, Sparkles, Star, Waves, Zap } from 'lucide-react';
-import { CATALOG, CHAPTERS, EFFICIENCY_TARGET, LIMIT, costOf, fingerprint, restoreSave } from './levelModel';
+import { CATALOG, CHAPTERS, EFFICIENCY_TARGET, SAVE_KEY, costOf, isCurrentResult, passedChapters, restoreSave } from './levelModel';
 
 const readProgress = () => {
-  try { return { save: restoreSave(localStorage.getItem('system-sandbox:first-level:v2')), available: true }; }
+  try { return { save: restoreSave(localStorage.getItem(SAVE_KEY)), available: true }; }
   catch { return { save: null, available: false }; }
 };
 
@@ -67,15 +67,15 @@ export default function CampaignHome({ onOpenLevel, onOpenTutorial }) {
   }, []);
   const save = progress.save;
   const hasDesign = Boolean(save && save.design.nodes.length > 1);
-  const signature = save ? fingerprint(save.design) : null;
-  const passed = CHAPTERS.map(chapter => Boolean(save?.history.some(r => r.chapter === chapter.id && r.passed && r.fingerprint === signature)));
+  const passed = save ? passedChapters(save.certificates, save.design) : CHAPTERS.map(() => false);
+  const outdatedResults = save?.certificates.some(c => !isCurrentResult(c));
   const passedCount = passed.filter(Boolean).length;
   const cost = save ? costOf(save.design.nodes) : 0;
   const completed = passedCount === 3;
   const chapter = CHAPTERS[save?.chapter || 0];
   const cta = hasDesign ? completed ? 'Return to your system' : 'Continue building' : 'Play your first level';
   const milestones = [
-    { name: 'First link', description: 'Make a working short link.', earned: Boolean(save?.history.some(r => r.chapter === 0 && r.passed)) },
+    { name: 'First link', description: 'Make a working short link.', earned: Boolean(save?.certificates.some(r => r.chapter === 0)) },
     { name: 'Traffic tested', description: 'Pass all three with one design.', earned: completed },
     { name: 'Small & mighty', description: `Pass all three for $${EFFICIENCY_TARGET}/mo or less.`, earned: completed && cost <= EFFICIENCY_TARGET },
   ];
@@ -95,14 +95,14 @@ export default function CampaignHome({ onOpenLevel, onOpenTutorial }) {
           <h1 id="hero-title">Build systems.<br />Send traffic.<br /><em>Learn what breaks.</em></h1>
           <p>Little servers. Big decisions. Connect the pieces, turn up the traffic, and discover why your system works—or why it doesn’t.</p>
           <div className="hub-hero-actions"><button className="hub-primary" onClick={onOpenLevel}><Play size={18} fill="currentColor" />{cta}<ArrowRight size={18} /></button><a className="hub-quiet-link" href="#how-to-play">Show me how <ArrowDown size={15} /></a></div>
-          <div className="hub-play-note">{hasDesign ? <><RefreshCw size={13} /><span>Resume “{chapter.name}” · {save.design.nodes.length - 1} components · ${cost}/mo</span></> : <><MousePointer2 size={14} /><span>No coding required. Learn by playing.</span></>}</div>
+          <div className="hub-play-note">{hasDesign ? <><RefreshCw size={13} /><span>Resume “{chapter.name}” · {save.design.nodes.length - 1} {save.design.nodes.length === 2 ? 'component' : 'components'} · ${cost}/mo</span></> : <><MousePointer2 size={14} /><span>No coding required. Learn by playing.</span></>}</div>
         </div>
         <div className="hub-preview-wrap">
           <div className="hub-preview-sticker"><Sparkles size={16} /><span>YOUR IDEAS.<br /><b>YOUR ARCHITECTURE.</b></span></div>
           <div className="hub-preview">
             <div className="hub-preview-top"><span><i className="hub-status-dot" />{hasDesign ? 'YOUR SAVED DESIGN' : 'A PEEK AT THE WORKBENCH'}</span><span>01 / THE LITTLE LINK</span></div>
             <div className="hub-preview-board"><BoardPreview design={hasDesign ? save.design : null} /><span className="hub-preview-caption">{hasDesign ? 'Exactly where you left it.' : 'One small link. A whole system behind it.'}</span></div>
-            <div className="hub-preview-bottom"><span><Link2 size={16} /> lnk / bakery</span><span>{hasDesign ? `${passedCount} / 3 challenges tested` : 'BUILD → TEST → UNDERSTAND'}</span></div>
+            <div className="hub-preview-bottom"><span><Link2 size={16} /> lnk / bakery</span><span>{hasDesign ? `${passedCount} / 3 challenges passed` : 'BUILD → TEST → UNDERSTAND'}</span></div>
           </div>
           <div className="hub-preview-note"><span>↳</span> There’s more than one right answer.</div>
         </div>
@@ -116,6 +116,7 @@ export default function CampaignHome({ onOpenLevel, onOpenTutorial }) {
             <div className="hub-featured-title"><span className="hub-link-icon"><Link2 size={28} /></span><div><small>URL SHORTENER</small><h3>The little link</h3></div></div>
             <p>A neighbourhood bakery needs a short link. Build the system that remembers it, then help it handle its first taste of fame.</p>
             <div className="hub-challenge-path" aria-label="Current design progress">{CHAPTERS.map((c, i) => <div key={c.id} className={passed[i] ? 'done' : hasDesign && c.id === chapter.id ? 'current' : ''}><span>{passed[i] ? <Check size={12} /> : `0${i + 1}`}</span><strong>{c.name}</strong><small>{c.tagline}</small></div>)}</div>
+            {outdatedResults && <p>Earlier-rule passes are saved. Retest your design to certify it under the current rules.</p>}
             <div className="hub-featured-footer"><span><Activity size={14} /> 3 traffic challenges <i /> Unlimited retries</span><button className="hub-round-button" onClick={onOpenLevel} aria-label={hasDesign ? 'Resume The little link' : 'Open The little link'}><ArrowRight size={20} /></button></div>
           </article>
 
