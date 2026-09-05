@@ -53,3 +53,5 @@ Pause or finish traffic to inspect **recorded outcomes**: filter completed/rejec
 The editor supports undo/redo and scoped keyboard deletion. Layout moves keep traffic recordings intact; behavioral edits invalidate them. `scripts/verify-edit-history.mjs` verifies these interactions using the same runtime argument.
 
 Starting a wire opens a service-call planner with request/reply explanations and invalid-target reasons. Components can also be moved using **Move without dragging**, then clicking/tapping an empty board position. `scripts/verify-connections.mjs` covers both flows.
+
+**Give me a nudge** opens a contextual question/evidence/experiment ladder. It uses the actual validation issue, budget or rejected-operation evidence and never cycles through a fixed topology recipe. `scripts/verify-help.mjs` verifies staged disclosure, dismissal and state changes.

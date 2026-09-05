@@ -9,6 +9,7 @@ import { behaviorChanged, emptyEditHistory, rememberEdit, sameDesign, travelHist
 import { Redo2 } from 'lucide-react';
 import ConnectionPlanner from './ConnectionPlanner.jsx';
 import { describeConnection } from './connectionGuidance.js';
+import { contextualHelp } from './contextualHelp.js';
 
 const ICONS = { internet: Activity, api: Server, database: Database, cache: Zap, loadBalancer: GitFork, idGenerator: KeyRound, cdn: Cloud };
 const round = n => Math.round(n || 0).toLocaleString();
@@ -139,7 +140,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const [trace, setTrace] = useState(null);
   const [traceKind, setTraceKind] = useState('read');
   const [traceHot, setTraceHot] = useState(false);
-  const [hint, setHint] = useState(0);
+  const [helpSteps, setHelpSteps] = useState({});
   const [size, setSize] = useState({ width: 800, height: 560 });
   const board = useRef(null), drag = useRef(null), suppressClick = useRef(false), timerState = useRef(null), priorState = useRef(null);
   const chapter = CHAPTERS[chapterId], validation = useMemo(() => validate(design), [design]);
@@ -147,6 +148,8 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const node = design.nodes.find(n => n.id === selected);
   const metrics = sim.frames[scrub ?? sim.frames.length - 1];
   const traceStep = trace?.steps[trace.index];
+  const help = contextualHelp(design, chapter, sim.report, sim.report ? sim.frames[sim.report.worstIndex] : metrics);
+  const helpStep = helpSteps[help.key] ?? -1;
   const currentPasses = passedChapters(certificates, design);
   const certified = currentPasses.every(Boolean);
   const previousResult = history.filter(h => h.chapter === chapterId && isCurrentResult(h)).at(-2);
@@ -266,7 +269,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   function edit(patch) { change({ ...design, nodes: design.nodes.map(n => n.id === selected ? { ...n, ...patch } : n) }); }
   function switchChapter(id) {
     if (sim.running) return;
-    setChapterId(id); setHint(0); setScrub(null); setTrace(null);
+    setChapterId(id); setScrub(null); setTrace(null); setMoveTarget(null);
     setSim({ running: false, paused: false, frames: [], report: null, suite: false });
   }
   function startTrace() {
@@ -307,7 +310,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
     change({ ...design, nodes: design.nodes.map(n => n.id === moveTarget ? { ...n, x, y } : n) });
     setMoveTarget(null); setNotice('Component moved. Undo restores its previous position.');
   }
-  const coachText = !design.nodes.some(n => n.type === 'api') ? 'Start with an API. Add it from the workbench below; this is where your link logic runs.' : !design.nodes.some(n => n.type === 'database') ? 'A server can answer a request, but a database remembers the link. Add one next.' : !validation.valid ? 'Connect the calls: choose the round connector on Visitors, then the API. Next connect the API to your database.' : !sim.frames.length ? 'Your design can make a link. Follow one request, or press Send traffic to test its capacity.' : 'Select a component to see its load. Pause traffic if you want time to think.';
+  const coachText = !validation.valid ? `${help.question} Use “Give me a nudge” for the specific evidence.` : !sim.frames.length ? 'Your connections satisfy the functional contract. Try a mapping or send traffic to test capacity.' : 'Select a component to see its load. Pause traffic to inspect recorded outcomes.';
 
   return <div className="l1-shell factory-game-shell">
     <header className="factory-hud-top l1-header">
@@ -327,8 +330,8 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
         <div className="l1-rules"><span>Success / sample <b>≥ {100 - CONTRACT_RULES.maxError}%</b></span><span>Est. latency <b>≤ {CONTRACT_RULES.maxLatencyMs} ms</b></span><span>Monthly cost <b>≤ ${LIMIT}</b></span></div>
         <button className="l1-text-button" onClick={() => setModelGuide(true)}><FlaskConical size={15} /> How tests are measured</button>
         <button className="l1-guide-button" disabled={sim.running && !sim.paused} onClick={() => setExperimentOpen(true)}><Link2 size={16} /> Try creating a real mapping <ChevronRight size={14} /></button>
-        <button className="l1-text-button" onClick={() => setHint(h => (h + 1) % 3)}><BookOpen size={15} />{hint ? 'Another perspective' : 'Give me a nudge'}</button>
-        {hint > 0 && <p className="l1-hint">{hint === 1 ? chapter.question : chapterId === 0 ? 'One API can use a database sequence to generate codes and a database to save them. Connect Visitors → API → Database.' : chapterId === 1 ? 'Compare a cache beside the API with a bigger database. The API itself also processes every request unless an edge answers first.' : 'Inspect database write load, then compare its tier and the code strategy on your API. New links cannot be served from cache.'}</p>}
+        <button className="l1-text-button" disabled={helpStep === 2} onClick={() => setHelpSteps(steps => ({ ...steps, [help.key]: Math.min(2, helpStep + 1) }))}><BookOpen size={15} />{helpStep < 0 ? 'Give me a nudge' : helpStep === 0 ? 'Show the evidence' : helpStep === 1 ? 'Suggest an experiment' : 'All hints shown'}</button>
+        {helpStep >= 0 && <section className="l1-help-ladder" aria-label="Contextual help"><strong>{help.question}</strong>{helpStep >= 1 && <p>{help.evidence}</p>}{helpStep >= 2 && <p>{help.experiment}</p>}{helpStep >= 1 && help.node && <button className="l1-text-button" onClick={() => { setSelected(help.node); setSelectedEdge(null); setTrace(null); setWire(null); if (sim.report) setScrub(sim.report.worstIndex); }}>Inspect the evidence</button>}<button className="l1-text-button" onClick={() => setHelpSteps(steps => ({ ...steps, [help.key]: -1 }))}>Dismiss help</button></section>}
         <div className="l1-mission-foot"><FlaskConical size={15} /><span>Same traffic every retry.<br />Make a change. Compare the result.</span></div>
       </aside>
 
