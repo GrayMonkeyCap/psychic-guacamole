@@ -13,10 +13,11 @@ export function simulateTraffic({ design, chapter, time, previous, dt, catalog, 
   const send = (from, to, job) => {
     const edge = edges[`${from}>${to}`] ||= { reads: 0, writes: 0 };
     edge[job.kind === 'read' ? 'reads' : 'writes'] += job.rate;
-    return { ...job, target: to };
+    return { ...job, target: to, calls: [...(job.calls || []), { from, to, kind: job.kind }] };
   };
   const finish = (job, blockedBy = null, reason = null) => {
-    if (job.rate > 0) outcomes.push({ kind: job.kind, rate: job.rate, chain: job.chain, latency: job.latency, blockedBy, reason });
+    if (job.rate > 0) outcomes.push({ kind: job.kind, rate: job.rate, chain: job.chain, latency: job.latency, blockedBy, reason,
+      calls: job.calls || [], cacheDecisions: job.cacheDecisions || [] });
   };
   // All foreground requests targeting a shared resource enter one fair batch.
   // Normalized service budgets persist across phases: optional cache fills use
@@ -68,8 +69,9 @@ export function simulateTraffic({ design, chapter, time, previous, dt, catalog, 
   const splitCache = (job, cacheId) => {
     const hits = job.rate * cacheHitRate(cacheId);
     loadFor(cacheId).hits += hits;
-    if (hits > 0) completeRead({ ...job, rate: hits });
-    return { ...job, rate: job.rate - hits, fillTargets: [...(job.fillTargets || []), cacheId] };
+    if (hits > 0) completeRead({ ...job, rate: hits, cacheDecisions: [...(job.cacheDecisions || []), { node: cacheId, status: 'hit' }] });
+    return { ...job, rate: job.rate - hits, fillTargets: [...(job.fillTargets || []), cacheId],
+      cacheDecisions: [...(job.cacheDecisions || []), { node: cacheId, status: 'miss' }] };
   };
 
   if (!validation.valid) {
@@ -149,7 +151,7 @@ export function simulateTraffic({ design, chapter, time, previous, dt, catalog, 
   for (const o of failed) rejectionByNode[o.blockedBy] = (rejectionByNode[o.blockedBy] || 0) + o.rate;
   const bottleneck = Object.entries(rejectionByNode).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0];
   const hottest = Object.keys(loads).sort((a, b) => loads[b].ratio - loads[a].ratio || a.localeCompare(b))[0];
-  return { time, rps, reads, writes, loads, edges, warmth, accounting, outcomes, bottleneck,
+  return { time, rps, reads, writes, loads, edges, warmth, accounting, outcomes, evidenceVersion: 1, bottleneck,
     estimatedLatencyMs: estimatedLatencyMs == null ? null : Math.round(estimatedLatencyMs),
     errorRate: rps > 0 ? Math.min(100, Math.max(0, rejectedRate / rps * 100)) : 0,
     cacheHit: reads > 0 ? Object.values(loads).reduce((n, l) => n + l.hits, 0) / reads * 100 : 0, hottest, validation };

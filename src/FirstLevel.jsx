@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Cloud, Database, FlaskConical, Gauge, GitFork, KeyRound, Link2, MousePointer2, Pause, Play, Plus, RotateCcw, Server, SkipForward, Star, Trash2, Undo2, X, Zap } from 'lucide-react';
 import { CATALOG, CHAPTERS, EMPTY_DESIGN, EFFICIENCY_TARGET, LIMIT, STRATEGIES, MODEL_VERSION, SAVE_KEY, SAVE_VERSION, CONTRACT_RULES, connectionError, costOf, isCurrentResult, passedChapters, recordCertificate, report, restoreSave, tick, traceRequest, validate } from './levelModel';
+import OutcomePicker from './OutcomePicker';
+import { componentLabel, traceOutcome } from './trafficEvidence.js';
+import LinkExperiment from './LinkExperiment.jsx';
+import { createLinkExperiment } from './linkExperiment.js';
 
 const ICONS = { internet: Activity, api: Server, database: Database, cache: Zap, loadBalancer: GitFork, idGenerator: KeyRound, cdn: Cloud };
 const round = n => Math.round(n || 0).toLocaleString();
@@ -116,6 +120,8 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const [welcome, setWelcome] = useState(forceTutorial || !saved);
   const [guide, setGuide] = useState(null);
   const [modelGuide, setModelGuide] = useState(false);
+  const [experimentOpen, setExperimentOpen] = useState(false);
+  const [experimentState, setExperimentState] = useState(createLinkExperiment);
   const [selected, setSelected] = useState('internet');
   const [wire, setWire] = useState(null);
   const [selectedEdge, setSelectedEdge] = useState(null);
@@ -143,6 +149,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const closeWelcome = useCallback(() => setWelcome(false), []);
   const closeGuide = useCallback(() => setGuide(null), []);
   const closeModelGuide = useCallback(() => setModelGuide(false), []);
+  const closeExperiment = useCallback(() => setExperimentOpen(false), []);
 
   useEffect(() => {
     if (certified) onLevelResult({ stars: cost <= EFFICIENCY_TARGET ? 3 : 2 });
@@ -183,13 +190,13 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   }, [wire, sim.running, design, change]);
   useEffect(() => {
     const key = e => {
-      if (welcome || guide || modelGuide || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+      if (welcome || guide || modelGuide || experimentOpen || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
       if (e.key === 'Escape') { setWire(null); setTrace(null); setSelectedEdge(null); }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
       if (e.key === 'Delete' && selected && !sim.running) remove(selected);
     };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
-  }, [welcome, guide, modelGuide, undo, selected, remove, sim.running]);
+  }, [welcome, guide, modelGuide, experimentOpen, undo, selected, remove, sim.running]);
 
   useEffect(() => {
     if (!sim.running || sim.paused) return;
@@ -245,6 +252,13 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   function startTrace() {
     setTrace({ steps: traceRequest(design, traceKind, traceHot), index: 0 }); setWire(null); setSelectedEdge(null);
   }
+  function inspectOutcome(index) {
+    if (!metrics || sim.running && !sim.paused) return;
+    const outcome = metrics.outcomes[index], steps = traceOutcome(design, outcome);
+    if (!steps.length) { setNotice('Recorded path unavailable for this sample. Run traffic again.'); return; }
+    setTraceKind(outcome.kind); setWire(null); setSelectedEdge(null);
+    setTrace({ source: 'recorded', steps, index: 0, time: metrics.time, rate: outcome.rate });
+  }
   function beginDrag(e, n) {
     if (sim.running || n.type === 'internet' || e.button !== 0 || e.target.closest('.l1-port')) return;
     suppressClick.current = false;
@@ -284,6 +298,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
         <div className="l1-forecast"><small>TRAFFIC FORECAST</small><div><strong>{round(chapter.peak)}</strong><span>requests / sec</span></div><div className="l1-mix"><i style={{ width: `${chapter.reads * 100}%` }} /></div><span><i className="l1-dot read" />{Math.round(chapter.reads * 100)}% redirects <i className="l1-dot write" />{Math.round((1 - chapter.reads) * 100)}% creations</span>{chapterId === 1 && <b>92% of reads visit one hot link.</b>}</div>
         <div className="l1-rules"><span>Success / sample <b>≥ {100 - CONTRACT_RULES.maxError}%</b></span><span>Est. latency <b>≤ {CONTRACT_RULES.maxLatencyMs} ms</b></span><span>Monthly cost <b>≤ ${LIMIT}</b></span></div>
         <button className="l1-text-button" onClick={() => setModelGuide(true)}><FlaskConical size={15} /> How tests are measured</button>
+        <button className="l1-guide-button" disabled={sim.running && !sim.paused} onClick={() => setExperimentOpen(true)}><Link2 size={16} /> Try creating a real mapping <ChevronRight size={14} /></button>
         <button className="l1-text-button" onClick={() => setHint(h => (h + 1) % 3)}><BookOpen size={15} />{hint ? 'Another perspective' : 'Give me a nudge'}</button>
         {hint > 0 && <p className="l1-hint">{hint === 1 ? chapter.question : chapterId === 0 ? 'One API can use a database sequence to generate codes and a database to save them. Connect Visitors → API → Database.' : chapterId === 1 ? 'Compare a cache beside the API with a bigger database. The API itself also processes every request unless an edge answers first.' : 'Inspect database write load, then compare its tier and the code strategy on your API. New links cannot be served from cache.'}</p>}
         <div className="l1-mission-foot"><FlaskConical size={15} /><span>Same traffic every retry.<br />Make a change. Compare the result.</span></div>
@@ -325,9 +340,9 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
       <aside className="l1-inspector l1-paper">
         <div className="l1-eyebrow">{trace ? 'REQUEST INSPECTOR' : selectedEdge ? 'CONNECTION INSPECTOR' : 'COMPONENT INSPECTOR'}</div>
         {trace ? <>
-          <div className="l1-inspector-heading"><h2>{traceKind === 'read' ? 'Follow a redirect' : 'Create a link'}</h2><button className="l1-text-button" onClick={() => setTrace(null)} aria-label="Close request trace"><X size={18} /></button></div>
-          <p className="l1-muted">One illustrative request through your architecture. Click any step to follow the conversation.</p>
-          <ol className="l1-trace-steps">{trace.steps.map((step, i) => <li key={i}><button className={i === trace.index ? 'active' : ''} onClick={() => setTrace(t => ({ ...t, index: i }))}><b>{i < trace.index ? <Check size={12} /> : i + 1}</b><span>{step.title}<small>{nameOf(design.nodes.find(n => n.id === step.node))}</small></span></button></li>)}</ol>
+          <div className="l1-inspector-heading"><h2>{trace.source === 'recorded' ? traceKind === 'read' ? 'Recorded redirects' : 'Recorded creations' : traceKind === 'read' ? 'Follow a redirect' : 'Create a link'}</h2><button className="l1-text-button" onClick={() => setTrace(null)} aria-label="Close request trace"><X size={18} /></button></div>
+          <p className="l1-muted">{trace.source === 'recorded' ? `${trace.time.toFixed(1)}s sample · ≈ ${trace.rate.toLocaleString(undefined, { maximumFractionDigits: 1 })} requests/sec. Calls and outcomes come from this run; reply steps explain the synchronous return path. This is a request group, not an individual capture.` : 'One illustrative request through your architecture, not evidence from a traffic run. Click any step to follow the conversation.'}</p>
+          <ol className="l1-trace-steps">{trace.steps.map((step, i) => <li key={i}><button className={i === trace.index ? 'active' : ''} onClick={() => setTrace(t => ({ ...t, index: i }))}><b>{i < trace.index ? <Check size={12} /> : i + 1}</b><span>{step.title}<small>{componentLabel(design, step.node)}</small></span></button></li>)}</ol>
           <div className="l1-trace-detail"><strong>{traceStep.title}</strong><p>{traceStep.detail}</p></div>
         </> : selectedEdge ? (() => { const edge = design.edges.find(e => e.id === selectedEdge); return edge && <><h2>One call. Two directions.</h2><p>{nameOf(design.nodes.find(n => n.id === edge.from))} calls {nameOf(design.nodes.find(n => n.id === edge.to))}. The result returns on the same connection.</p><div className="l1-callout">→ request<br />← response</div><p className="l1-muted">A reverse wire would mean a different service call, not a reply.</p><button className="l1-danger-button" disabled={sim.running} onClick={() => { change({ ...design, edges: design.edges.filter(e => e.id !== selectedEdge) }); setSelectedEdge(null); }}><Trash2 size={15} /> Disconnect call</button><button className="l1-text-button" onClick={() => setSelectedEdge(null)}>Back to component</button></>; })() : node && CATALOG[node.type] ? (() => {
           const config = CATALOG[node.type], Icon = ICONS[node.type], load = metrics?.loads[node.id];
@@ -341,7 +356,9 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
             <button className="l1-danger-button" disabled={sim.running} onClick={() => remove(node.id)}><Trash2 size={14} /> Remove component</button>
           </>;
         })() : <><span className="l1-inspector-illustration"><MousePointer2 size={36} /></span><h2>A system you can explain.</h2><p>Select a component to see its job, tune its capacity, and understand its tradeoffs.</p><div className="l1-callout"><Link2 size={17} /><span>Choose a round <b>+</b> connector, then the service it calls. One wire carries the request and its reply.</span></div><p className="l1-muted">Drag a component to arrange your board. Arrow keys move a focused component. Click a wire label to disconnect it. Undo is always available while building.</p></>}
-        {!trace && <div className="l1-trace-launch"><div className="l1-section-label">UNDERSTAND ONE REQUEST</div><div className="l1-segment"><button onClick={() => setTraceKind('read')} className={traceKind === 'read' ? 'active' : ''}>Redirect</button><button onClick={() => setTraceKind('write')} className={traceKind === 'write' ? 'active' : ''}>Create link</button></div>{traceKind === 'read' && <label className="l1-check"><input type="checkbox" checked={traceHot} onChange={e => setTraceHot(e.target.checked)} /> Assume a warm cached entry</label>}<button className="l1-trace-button" disabled={sim.running} onClick={startTrace}><RouteIcon /> Follow one request <ArrowRight size={15} /></button></div>}
+        {!trace && metrics && (!sim.running || sim.paused) && <OutcomePicker frame={metrics} design={design} onSelect={inspectOutcome} />}
+        {!trace && sim.running && !sim.paused && <p className="l1-muted">Pause traffic to inspect recorded paths, or wait for the test to finish.</p>}
+        {!trace && <div className="l1-trace-launch"><div className="l1-section-label">ILLUSTRATIVE WALKTHROUGH</div><div className="l1-segment"><button onClick={() => setTraceKind('read')} className={traceKind === 'read' ? 'active' : ''}>Redirect</button><button onClick={() => setTraceKind('write')} className={traceKind === 'write' ? 'active' : ''}>Create link</button></div>{traceKind === 'read' && <label className="l1-check"><input type="checkbox" checked={traceHot} onChange={e => setTraceHot(e.target.checked)} /> Assume a warm cached entry</label>}<button className="l1-trace-button" disabled={sim.running} onClick={startTrace}><RouteIcon /> Follow one request <ArrowRight size={15} /></button></div>}
         {metrics?.accounting && <div className="l1-accounting" aria-label="Request accounting for selected sample"><div className="l1-section-label">THIS SAMPLE · ESTIMATED REQ/S</div><div><span>Incoming</span><b>{round(metrics.rps)}</b></div><div><span>Completed</span><b>{round(metrics.accounting.completed / .2)}</b></div><div><span>Rejected</span><b>{round(metrics.accounting.rejected / .2)}</b></div><p>Every request completes or is rejected. This level has no waiting queue or retries.</p></div>}
         <div className="l1-save-note">{storageWarning ? 'Browser storage unavailable. Keep this tab open to preserve your design.' : 'Design and earned passes saved on this device.'}{outdatedResults && <p>Earlier-rule passes are kept. Retest to certify this design under the current rules.</p>}</div>
       </aside>
@@ -352,17 +369,28 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
     <footer className="l1-controls">
       <div className="l1-system-state"><span className={`l1-status-orb ${metrics && (metrics.errorRate > CONTRACT_RULES.maxError || metrics.estimatedLatencyMs > CONTRACT_RULES.maxLatencyMs) ? 'danger' : sim.running ? 'live' : ''}`} /><div><small>{sim.running ? sim.suite ? 'FULL CONTRACT TEST' : 'TRAFFIC TEST' : sim.report ? 'REPLAY & INSPECT' : 'BUILD MODE'}</small><strong>{sim.running ? sim.paused ? 'Paused. Take a look.' : `${chapter.name} · ${(metrics?.time || 0).toFixed(0)} / ${chapter.duration}s` : sim.report ? 'Drag the timeline to inspect' : validation.valid ? 'Ready for visitors' : 'Connect your first system'}</strong></div></div>
       <div className="l1-metrics"><div><small>INCOMING</small><strong>{metrics ? round(metrics.rps) : '—'}<i>/s</i></strong></div><div className={metrics?.estimatedLatencyMs > CONTRACT_RULES.maxLatencyMs ? 'bad' : ''}><small>EST. LATENCY</small><strong>{metrics?.estimatedLatencyMs ?? '—'}<i>ms</i></strong></div><div className={metrics?.errorRate > CONTRACT_RULES.maxError ? 'bad' : ''}><small>SUCCESS</small><strong>{metrics ? (100 - metrics.errorRate).toFixed(1) : '—'}<i>%</i></strong></div></div>
-      <Plot frames={sim.frames} index={scrub} onScrub={!sim.running && sim.frames.length ? setScrub : undefined} />
-      <div className="l1-run-buttons">{sim.running ? <><button className="l1-secondary" onClick={() => setSim(s => ({ ...s, paused: !s.paused }))} aria-label={sim.paused ? 'Resume traffic' : 'Pause traffic'}>{sim.paused ? <Play size={18} /> : <Pause size={18} />}</button><button className="l1-secondary" onClick={() => { timerState.current = null; setSim(s => ({ ...s, running: false, paused: false })); }} title="Stop test and edit">Edit <X size={16} /></button></> : <><button className="l1-secondary" disabled={unlocked < 2} onClick={() => start(true)} title={unlocked < 2 ? 'Complete the challenges to unlock full-contract testing' : 'Test this design against all three challenges'}><SkipForward size={16} /><span>All three</span></button><button className="l1-primary" onClick={() => start(false)}><Play size={18} fill="currentColor" />{sim.frames.length ? 'Try again' : 'Send traffic'}</button></>}</div>
+      <Plot frames={sim.frames} index={scrub} onScrub={!sim.running && sim.frames.length ? index => { setTrace(null); setScrub(index); } : undefined} />
+      <div className="l1-run-buttons">{sim.running ? <><button className="l1-secondary" onClick={() => { setTrace(null); setSim(s => ({ ...s, paused: !s.paused })); }} aria-label={sim.paused ? 'Resume traffic' : 'Pause traffic'}>{sim.paused ? <Play size={18} /> : <Pause size={18} />}</button><button className="l1-secondary" onClick={() => { timerState.current = null; setSim(s => ({ ...s, running: false, paused: false })); }} title="Stop test and edit">Edit <X size={16} /></button></> : <><button className="l1-secondary" disabled={unlocked < 2} onClick={() => start(true)} title={unlocked < 2 ? 'Complete the challenges to unlock full-contract testing' : 'Test this design against all three challenges'}><SkipForward size={16} /><span>All three</span></button><button className="l1-primary" onClick={() => start(false)}><Play size={18} fill="currentColor" />{sim.frames.length ? 'Try again' : 'Send traffic'}</button></>}</div>
     </footer>
     {notice && <div className="l1-notice" role="alert"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss message"><X size={18} /></button></div>}
     {welcome && <Briefing onClose={closeWelcome} />}
     {guide && <Guide type={guide} onClose={closeGuide} />}
     {modelGuide && <ModelGuide onClose={closeModelGuide} />}
+    {experimentOpen && <LinkExperimentDialog design={design} state={experimentState} onChange={setExperimentState} onClose={closeExperiment} />}
   </div>;
 }
 
 function RouteIcon() { return <GitFork size={15} />; }
+
+function LinkExperimentDialog({ onClose, ...props }) {
+  const ref = useRef(null);
+  useFocusDialog(ref, onClose);
+  return <div className="l1-shade"><section ref={ref} className="l1-dialog l1-link-lab-dialog" role="dialog" aria-modal="true" aria-labelledby="link-lab-title">
+    <button className="l1-text-button" onClick={onClose} aria-label="Close link experiment"><X size={18} /> Back to your system</button>
+    <h2 id="link-lab-title">Where does your link live?</h2>
+    <LinkExperiment {...props} />
+  </section></div>;
+}
 
 function ModelGuide({ onClose }) {
   const ref = useRef(null);
@@ -376,7 +404,7 @@ function ModelGuide({ onClose }) {
       <dt>Estimated latency · at most {CONTRACT_RULES.maxLatencyMs} ms</dt><dd>We add estimated service delays along successful paths, then select the path delay covering 99% of completed traffic. Rejected requests do not masquerade as fast successes. This is not a measured request-time percentile. With no completions, latency is unavailable. The report shows the highest available estimate.</dd>
       <dt>Cost · at most ${LIMIT}/month</dt><dd>All placed components count, including unused ones. Prices and capacities are game units, not cloud-provider quotes.</dd>
       <dt>How does cache warm up?</dt><dd>All callers see the same cache state at the start of a sample. Only a successful origin read can fill it, using capacity left after lookups. A skipped optional fill does not fail that redirect. Successful fills affect later samples.</dd>
-      <dt>What is simplified?</dt><dd>Traffic uses fractional request groups, not individual keys or packets. Work within a sample completes immediately; real queueing and network delays are not simulated. Cache warmth estimates reuse rather than tracking entries or expiration. “Follow one request” remains illustrative, not a captured traffic sample.</dd>
+      <dt>What is simplified?</dt><dd>Traffic uses fractional request groups, not individual keys or packets. Work within a sample completes immediately; real queueing and network delays are not simulated. Cache warmth estimates reuse rather than tracking entries or expiration. Recorded outcomes follow calls from the selected traffic sample; reply steps explain their synchronous return. “Follow one request” is a separate illustrative walkthrough. Optional cache fills are sample-level work, not claimed as individual trace events.</dd>
       <dt>Your passes stay yours</dt><dd>Recent attempts may roll off the timeline history; earned passes do not. Each pass belongs to a design and a set of rules. Moving components does not change certification. Changing their behavior requires a matching pass; undoing that change restores it.</dd>
     </dl>
     <p className="l1-muted">Model: {MODEL_VERSION}. Rule changes keep old records but require new tests. Replication, failures, real collision probabilities and production sizing are outside this model.</p>

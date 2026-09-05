@@ -10,6 +10,34 @@
 .l1-accounting { margin: 18px 0; padding: 14px; border: 1px solid var(--stroke); border-radius: 12px; background: #f5efd9; }
 .l1-accounting > div:not(.l1-section-label) { display: flex; justify-content: space-between; gap: 12px; margin-top: 7px; font-size: 14px; }
 .l1-accounting p { margin: 12px 0 0; font-size: 14px; line-height: 1.5; }
+.l1-outcomes { margin-top: 20px; border-top: 1px solid var(--stroke); padding-top: 14px; }
+.l1-outcomes h3 { margin: 0 0 8px; font-size: 16px; }
+.l1-outcomes > p { font-size: 14px; line-height: 1.5; }
+.l1-outcomes label { display: grid; gap: 6px; font-size: 14px; }
+.l1-outcomes select { width: 100%; min-height: 40px; padding: 6px; border: 1px solid var(--stroke); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; }
+.l1-outcome-list { display: grid; gap: 8px; max-height: 320px; overflow-y: auto; padding: 5px; margin: 8px -5px 0; }
+.l1-outcome-list button { display: grid; gap: 5px; text-align: left; padding: 12px; border: 1px solid #9eae93; border-left: 4px solid #608571; border-radius: 10px; background: #f0f0d9; color: var(--ink); }
+.l1-outcome-list button.rejected { border-left-color: #ab5a32; background: #fff0d9; }
+.l1-outcome-list strong, .l1-outcome-list span { font-size: 14px; }
+.l1-outcome-list small { font-size: 12px; }
+.l1-dialog.l1-link-lab-dialog { width: 660px; }
+.l1-link-lab-dialog .l1-link-experiment p { font-size: 16px; color: var(--ink); line-height: 1.5; overflow-wrap: anywhere; }
+.l1-link-experiment label { display: grid; gap: 8px; font-size: 14px; font-weight: 600; }
+.l1-link-experiment input:not([type="checkbox"]), .l1-link-experiment select { min-width: 0; width: 100%; min-height: 44px; padding: 10px; border: 1px solid var(--stroke); border-radius: 10px; font: inherit; background: #fffdf4; color: var(--ink); }
+.l1-link-experiment form { display: grid; gap: 12px; margin: 18px 0; }
+.l1-link-experiment .l1-experiment-check { display: flex; align-items: start; line-height: 1.5; }
+.l1-experiment-check input { flex: 0 0 auto; width: 20px; height: 20px; }
+.l1-experiment-boundary { border-left: 3px solid #728f7b; padding-left: 12px; }
+.l1-experiment-result { margin-top: 18px; padding: 14px; background: #f0eed6; border: 1px solid var(--stroke); border-radius: 12px; overflow-wrap: anywhere; }
+.l1-experiment-result ol { padding-left: 24px; }
+.l1-experiment-result li { margin-top: 15px; }
+.l1-experiment-result small { display: block; font-size: 12px; margin-top: 4px; }
+.l1-experiment-table { overflow: auto; }
+.l1-experiment-table table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 14px; }
+.l1-experiment-table th, .l1-experiment-table td { text-align: left; padding: 10px 6px; border-bottom: 1px solid var(--stroke); overflow-wrap: anywhere; }
+.l1-experiment-table th:first-child { width: 100px; }
+.l1-experiment-table button { min-height: 44px; padding: 6px; background: var(--paper); color: var(--ink); border: 1px solid var(--stroke); border-radius: 8px; }
+.l1-experiment-reset { margin-top: 20px; }
 .l1-shell button:focus-visible, .l1-shell select:focus-visible, .l1-shell input:focus-visible { outline: 3px solid #287e9c; outline-offset: 3px; }
 .l1-shell small, .l1-eyebrow, .l1-section-label { font-family: 'DM Mono', monospace; }
 .l1-header { gap: 18px; padding: 12px 22px; grid-template-columns: auto 1fr auto; }

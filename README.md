@@ -45,3 +45,7 @@ Earned passes are stored independently of the 12 most recent attempts, keyed by 
 Latency is labelled **estimated latency**, not measured p99. The optional **How tests are measured** panel explains the estimate, per-sample success contract, costs and model limitations. See the [current model contract](docs/level-1-model-contract.md) before changing simulation rules.
 
 The `admission-v2` simulator uses explicit fail-fast capacity: rejected requests stop before the next dependency, shared resources admit proportional work, and cache fills occur only after successful reads with available fill capacity. There is no waiting queue in this model. The inspector shows admitted/rejected requests and successful/skipped fills; terminal outcomes and per-operation accounting are tested in `src/trafficModel.test.js`. Earlier-model passes remain saved but require retesting for current certification.
+
+Pause or finish traffic to inspect **recorded outcomes**: filter completed/rejected groups and follow the actual calls, cache decisions and explained reply path. The illustrative walkthrough stays separate. **Try creating a real mapping** opens a bounded experiment for create/open, uniqueness, collision retry and cache loss; destinations never leave the page, and experiment data is not saved across leaving/reloading the level.
+
+`scripts/verify-outcomes.mjs` and `scripts/verify-link-experiment.mjs` exercise these features in isolated browser contexts. Run them with the same Playwright runtime argument as the other browser checks.
