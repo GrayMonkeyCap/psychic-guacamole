@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Activity, ArrowDown, ArrowRight, BookOpen, Check, ChevronRight, Cloud, Code2, Database, GitFork, Link2, MessageCircle, MousePointer2, Play, RadioTower, RefreshCw, Server, ShieldCheck, Sparkles, Star, Waves, Zap } from 'lucide-react';
-import { CATALOG, CHAPTERS, EFFICIENCY_TARGET, SAVE_KEY, costOf, isCurrentResult, passedChapters, restoreSave } from './levelModel';
+import { CATALOG, CHAPTERS, EFFICIENCY_TARGET, costOf, isCurrentResult, passedChapters } from './levelModel';
+import { readStoredProgress } from './saveBackups.js';
 
 const readProgress = () => {
-  try { return { save: restoreSave(localStorage.getItem(SAVE_KEY)), available: true }; }
+  try { return readStoredProgress(localStorage); }
   catch { return { save: null, available: false }; }
 };
 
@@ -109,6 +110,7 @@ export default function CampaignHome({ onOpenLevel, onOpenTutorial }) {
       </section>
 
       <section id="missions" className="hub-missions" aria-labelledby="missions-title">
+        {progress.recovered && <p role="status">Your main save could not be read. This is the recovery copy from before your last restore. Open the level to keep it or import another backup.</p>}
         <div className="hub-section-heading"><div><span className="hub-eyebrow">THE CAMPAIGN</span><h2 id="missions-title">Start small. Think bigger.</h2></div><span className="hub-available"><span className="hub-status-dot" /> 1 playable level · more on the drawing board</span></div>
         <div className="hub-mission-grid">
           <article className="hub-featured hub-paper">

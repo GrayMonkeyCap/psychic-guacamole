@@ -55,3 +55,5 @@ The editor supports undo/redo and scoped keyboard deletion. Layout moves keep tr
 Starting a wire opens a service-call planner with request/reply explanations and invalid-target reasons. Components can also be moved using **Move without dragging**, then clicking/tapping an empty board position. `scripts/verify-connections.mjs` covers both flows.
 
 **Give me a nudge** opens a contextual question/evidence/experiment ladder. It uses the actual validation issue, budget or rejected-operation evidence and never cycles through a fixed topology recipe. `scripts/verify-help.mjs` verifies staged disclosure, dismissal and state changes.
+
+**Save backups & restore** downloads/imports versioned JSON files entirely on-device. Imports are validated and previewed before confirmation; restoring keeps a downloadable recovery copy. The recovery slot can rescue a corrupt primary save. Backups include the board and pass ledger, not session link destinations or traffic frames. `scripts/verify-backups.mjs` checks export/import, cancellation, recovery, reload and modal focus.

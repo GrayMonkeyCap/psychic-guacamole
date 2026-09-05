@@ -219,8 +219,9 @@ export function restoreSave(raw) {
     if (![2, SAVE_VERSION].includes(save?.version) || !Array.isArray(save.design?.nodes) || !Array.isArray(save.design?.edges)) return null;
     const { nodes, edges } = save.design;
     if (nodes.length > 40 || edges.length > 100 || nodes.filter(n => n.id === 'internet' && n.type === 'internet').length !== 1 || new Set(nodes.map(n => n.id)).size !== nodes.length) return null;
-    if (!nodes.every(n => typeof n.id === 'string' && Number.isFinite(n.x) && n.x >= 0 && n.x <= 85 && Number.isFinite(n.y) && n.y >= 0 && n.y <= 82 && (n.type === 'internet' ? n.id === 'internet' : CATALOG[n.type]?.tiers[n.tier] && Number.isInteger(n.tier)) && (n.type !== 'api' || STRATEGIES[n.strategy || 'sequence']))) return null;
-    if (!edges.every(e => typeof e.id === 'string' && nodes.some(n => n.id === e.from) && nodes.some(n => n.id === e.to))) return null;
+    if (!nodes.every(n => typeof n.id === 'string' && Number.isFinite(n.x) && n.x >= 0 && n.x <= 85 && Number.isFinite(n.y) && n.y >= 0 && n.y <= 82 && (n.type === 'internet' ? n.id === 'internet' : (Object.hasOwn(CATALOG, n.type) && CATALOG[n.type]?.tiers[n.tier]) && Number.isInteger(n.tier)) && (n.type !== 'api' || Object.hasOwn(STRATEGIES, n.strategy || 'sequence')))) return null;
+    if (nodes.some(n => !n.id.length || n.id.length > 128 || ['__proto__', 'constructor', 'prototype'].includes(n.id))) return null;
+    if (new Set(edges.map(e => e.id)).size !== edges.length || !edges.every(e => typeof e.id === 'string' && e.id.length > 0 && e.id.length <= 256 && nodes.some(n => n.id === e.from) && nodes.some(n => n.id === e.to))) return null;
     const unlocked = Math.max(0, Math.min(2, Math.floor(Number(save.unlocked) || 0)));
     const normalize = r => {
       if (!r || !Number.isInteger(r.chapter) || !CHAPTERS[r.chapter] || typeof r.passed !== 'boolean'
@@ -240,7 +241,10 @@ export function restoreSave(raw) {
     // Only v2 needs history migration. v3's durable ledger is independent of recent attempts.
     const candidates = save.version === 2 ? allHistory : (Array.isArray(save.certificates) ? save.certificates : []).map(normalize).filter(Boolean);
     const certificates = candidates.reduce(recordCertificate, []);
-    return { version: SAVE_VERSION, design: save.design, unlocked,
+    const design = { nodes: nodes.map(n => ({ id: n.id, type: n.type, x: n.x, y: n.y,
+      ...(Number.isInteger(n.tier) ? { tier: n.tier } : {}), ...(typeof n.strategy === 'string' && Object.hasOwn(STRATEGIES, n.strategy) ? { strategy: n.strategy } : {}) })),
+      edges: edges.map(e => ({ id: e.id, from: e.from, to: e.to })) };
+    return { version: SAVE_VERSION, design, unlocked,
       chapter: Math.max(0, Math.min(unlocked, Math.floor(Number(save.chapter) || 0))), guided: save.guided !== false, history, certificates };
   } catch { return null; }
 }

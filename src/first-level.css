@@ -29,6 +29,9 @@
 .l1-board.placing { cursor: crosshair; }
 .l1-help-ladder { margin-top: 10px; padding: 12px; border: 1px solid #c6c5a4; border-radius: 10px; background: #f2edd3; font-size: 14px; line-height: 1.5; }
 .l1-mission .l1-help-ladder p { font-size: 14px; line-height: 1.5; }
+.l1-backups label { display: grid; gap: 10px; margin: 22px 0; font-size: 14px; }
+.l1-backups input { max-width: 100%; font: inherit; }
+.l1-backup-preview { margin-top: 20px; padding: 14px; border: 1px solid var(--stroke); border-radius: 12px; background: #f0efdb; }
 .l1-dialog.l1-link-lab-dialog { width: 660px; }
 .l1-link-lab-dialog .l1-link-experiment p { font-size: 16px; color: var(--ink); line-height: 1.5; overflow-wrap: anywhere; }
 .l1-link-experiment label { display: grid; gap: 8px; font-size: 14px; font-weight: 600; }

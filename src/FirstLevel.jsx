@@ -10,6 +10,8 @@ import { Redo2 } from 'lucide-react';
 import ConnectionPlanner from './ConnectionPlanner.jsx';
 import { describeConnection } from './connectionGuidance.js';
 import { contextualHelp } from './contextualHelp.js';
+import SaveBackups from './SaveBackups.jsx';
+import { readStoredProgress, RECOVERY_KEY } from './saveBackups.js';
 
 const ICONS = { internet: Activity, api: Server, database: Database, cache: Zap, loadBalancer: GitFork, idGenerator: KeyRound, cdn: Cloud };
 const round = n => Math.round(n || 0).toLocaleString();
@@ -17,7 +19,7 @@ const latencyLabel = n => n == null ? 'No completed requests' : `${n} ms`;
 const uid = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
 const bounded = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const nameOf = node => node?.type === 'internet' ? 'Visitors' : CATALOG[node?.type]?.name || 'Component';
-const readSave = () => { try { return restoreSave(localStorage.getItem(SAVE_KEY)); } catch { return null; } };
+const readSave = () => { try { return readStoredProgress(localStorage); } catch { return { save: null, available: false, recovered: false }; } };
 
 function useFocusDialog(ref, close) {
   useEffect(() => {
@@ -115,7 +117,8 @@ function Plot({ frames = [], index, onScrub }) {
 }
 
 export default function FirstLevel({ onExit, onLevelResult, forceTutorial = false }) {
-  const [saved] = useState(readSave);
+  const [loaded] = useState(readSave);
+  const saved = loaded.save;
   const [design, setDesign] = useState(saved?.design || EMPTY_DESIGN);
   const [chapterId, setChapterId] = useState(saved?.chapter || 0);
   const [unlocked, setUnlocked] = useState(saved?.unlocked || 0);
@@ -127,12 +130,14 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const [modelGuide, setModelGuide] = useState(false);
   const [experimentOpen, setExperimentOpen] = useState(false);
   const [experimentState, setExperimentState] = useState(createLinkExperiment);
+  const [backupsOpen, setBackupsOpen] = useState(false);
+  const [recovery, setRecovery] = useState(() => { try { return restoreSave(localStorage.getItem(RECOVERY_KEY)); } catch { return null; } });
   const [selected, setSelected] = useState('internet');
   const [wire, setWire] = useState(null);
   const [moveTarget, setMoveTarget] = useState(null);
   const [selectedEdge, setSelectedEdge] = useState(null);
   const [allTools, setAllTools] = useState(false);
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(loaded.recovered ? 'Recovered your board from the last recovery copy. Download a backup to keep a separate copy.' : '');
   const [storageWarning, setStorageWarning] = useState(false);
   const [edits, setEdits] = useState(emptyEditHistory);
   const [sim, setSim] = useState({ running: false, paused: false, frames: [], report: null, suite: false });
@@ -158,6 +163,21 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const closeGuide = useCallback(() => setGuide(null), []);
   const closeModelGuide = useCallback(() => setModelGuide(false), []);
   const closeExperiment = useCallback(() => setExperimentOpen(false), []);
+  const closeBackups = useCallback(() => setBackupsOpen(false), []);
+  const currentSave = { version: SAVE_VERSION, design, chapter: chapterId, unlocked, guided, history, certificates };
+  function restoreBackup(next) {
+    setRecovery(currentSave);
+    let warning = '';
+    try { localStorage.setItem(RECOVERY_KEY, JSON.stringify(currentSave)); }
+    catch { warning = 'Restored. The previous board is recoverable only in this session because browser storage is unavailable. Download a separate backup before closing.'; }
+    setDesign(next.design); setChapterId(next.chapter); setUnlocked(next.unlocked); setGuided(next.guided);
+    setHistory(next.history); setCertificates(next.certificates); setEdits(emptyEditHistory());
+    setExperimentState(createLinkExperiment()); setHelpSteps({});
+    setSelected('internet'); setSelectedEdge(null); setTrace(null); setScrub(null); setWire(null); setMoveTarget(null);
+    timerState.current = null; priorState.current = null;
+    setSim({ running: false, paused: false, frames: [], report: null, suite: false });
+    return warning;
+  }
 
   useEffect(() => {
     if (certified) onLevelResult({ stars: cost <= EFFICIENCY_TARGET ? 3 : 2 });
@@ -208,7 +228,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   }, [wire, sim.running, design, change]);
   useEffect(() => {
     const key = e => {
-      if (welcome || guide || modelGuide || experimentOpen || e.target.isContentEditable || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+      if (welcome || guide || modelGuide || experimentOpen || backupsOpen || e.target.isContentEditable || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
       if (e.key === 'Escape') { setWire(null); setMoveTarget(null); setTrace(null); setSelectedEdge(null); }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
       if (e.ctrlKey && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
@@ -219,7 +239,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
       }
     };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
-  }, [welcome, guide, modelGuide, experimentOpen, undo, redo, remove, sim.running, change, design]);
+  }, [welcome, guide, modelGuide, experimentOpen, backupsOpen, undo, redo, remove, sim.running, change, design]);
 
   useEffect(() => {
     if (!sim.running || sim.paused) return;
@@ -394,6 +414,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
         {!trace && <div className="l1-trace-launch"><div className="l1-section-label">ILLUSTRATIVE WALKTHROUGH</div><div className="l1-segment"><button onClick={() => setTraceKind('read')} className={traceKind === 'read' ? 'active' : ''}>Redirect</button><button onClick={() => setTraceKind('write')} className={traceKind === 'write' ? 'active' : ''}>Create link</button></div>{traceKind === 'read' && <label className="l1-check"><input type="checkbox" checked={traceHot} onChange={e => setTraceHot(e.target.checked)} /> Assume a warm cached entry</label>}<button className="l1-trace-button" disabled={sim.running} onClick={startTrace}><RouteIcon /> Follow one request <ArrowRight size={15} /></button></div>}
         {metrics?.accounting && <div className="l1-accounting" aria-label="Request accounting for selected sample"><div className="l1-section-label">THIS SAMPLE · ESTIMATED REQ/S</div><div><span>Incoming</span><b>{round(metrics.rps)}</b></div><div><span>Completed</span><b>{round(metrics.accounting.completed / .2)}</b></div><div><span>Rejected</span><b>{round(metrics.accounting.rejected / .2)}</b></div><p>Every request completes or is rejected. This level has no waiting queue or retries.</p></div>}
         <div className="l1-save-note">{storageWarning ? 'Browser storage unavailable. Keep this tab open to preserve your design.' : 'Design and earned passes saved on this device.'}{outdatedResults && <p>Earlier-rule passes are kept. Retest to certify this design under the current rules.</p>}</div>
+        <button className="l1-guide-button" disabled={sim.running} onClick={() => setBackupsOpen(true)}>Save backups & restore <ChevronRight size={15} /></button>
       </aside>
     </main>
 
@@ -410,10 +431,17 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
     {guide && <Guide type={guide} onClose={closeGuide} />}
     {modelGuide && <ModelGuide onClose={closeModelGuide} />}
     {experimentOpen && <LinkExperimentDialog design={design} state={experimentState} onChange={setExperimentState} onClose={closeExperiment} />}
+    {backupsOpen && <BackupsDialog onClose={closeBackups} save={currentSave} recovery={recovery} onRestore={restoreBackup} />}
   </div>;
 }
 
 function RouteIcon() { return <GitFork size={15} />; }
+
+function BackupsDialog({ onClose, ...props }) {
+  const ref = useRef(null);
+  useFocusDialog(ref, onClose);
+  return <div className="l1-shade"><section ref={ref} className="l1-dialog l1-model-guide" role="dialog" aria-modal="true" aria-labelledby="backups-title"><button className="l1-text-button" onClick={onClose} aria-label="Close save backups"><X size={18} /> Back to your system</button><h2 id="backups-title">Keep your experiments safe.</h2><SaveBackups {...props} /></section></div>;
+}
 
 function LinkExperimentDialog({ onClose, ...props }) {
   const ref = useRef(null);
