@@ -51,3 +51,5 @@ Pause or finish traffic to inspect **recorded outcomes**: filter completed/rejec
 `scripts/verify-outcomes.mjs` and `scripts/verify-link-experiment.mjs` exercise these features in isolated browser contexts. Run them with the same Playwright runtime argument as the other browser checks.
 
 The editor supports undo/redo and scoped keyboard deletion. Layout moves keep traffic recordings intact; behavioral edits invalidate them. `scripts/verify-edit-history.mjs` verifies these interactions using the same runtime argument.
+
+Starting a wire opens a service-call planner with request/reply explanations and invalid-target reasons. Components can also be moved using **Move without dragging**, then clicking/tapping an empty board position. `scripts/verify-connections.mjs` covers both flows.

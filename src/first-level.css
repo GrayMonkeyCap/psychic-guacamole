@@ -20,6 +20,13 @@
 .l1-outcome-list button.rejected { border-left-color: #ab5a32; background: #fff0d9; }
 .l1-outcome-list strong, .l1-outcome-list span { font-size: 14px; }
 .l1-outcome-list small { font-size: 12px; }
+.l1-connection-planner label { display: grid; gap: 8px; font-size: 14px; }
+.l1-connection-planner select { width: 100%; min-height: 44px; border: 1px solid var(--stroke); border-radius: 8px; padding: 8px; font: inherit; background: var(--paper); color: var(--ink); }
+.l1-connection-planner .l1-call-preview { padding: 12px; margin: 14px 0; border: 1px solid var(--stroke); border-radius: 10px; background: #f0efdb; }
+.l1-inspector .l1-connection-planner p, .l1-call-preview strong { font-size: 14px; line-height: 1.5; }
+.l1-call-preview h3 { font-size: 14px; margin: 8px 0; }
+.l1-connection-planner .l1-primary { width: 100%; margin-top: 12px; }
+.l1-board.placing { cursor: crosshair; }
 .l1-dialog.l1-link-lab-dialog { width: 660px; }
 .l1-link-lab-dialog .l1-link-experiment p { font-size: 16px; color: var(--ink); line-height: 1.5; overflow-wrap: anywhere; }
 .l1-link-experiment label { display: grid; gap: 8px; font-size: 14px; font-weight: 600; }
