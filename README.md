@@ -49,3 +49,5 @@ The `admission-v2` simulator uses explicit fail-fast capacity: rejected requests
 Pause or finish traffic to inspect **recorded outcomes**: filter completed/rejected groups and follow the actual calls, cache decisions and explained reply path. The illustrative walkthrough stays separate. **Try creating a real mapping** opens a bounded experiment for create/open, uniqueness, collision retry and cache loss; destinations never leave the page, and experiment data is not saved across leaving/reloading the level.
 
 `scripts/verify-outcomes.mjs` and `scripts/verify-link-experiment.mjs` exercise these features in isolated browser contexts. Run them with the same Playwright runtime argument as the other browser checks.
+
+The editor supports undo/redo and scoped keyboard deletion. Layout moves keep traffic recordings intact; behavioral edits invalidate them. `scripts/verify-edit-history.mjs` verifies these interactions using the same runtime argument.

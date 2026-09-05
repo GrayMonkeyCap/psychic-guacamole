@@ -5,6 +5,8 @@ import OutcomePicker from './OutcomePicker';
 import { componentLabel, traceOutcome } from './trafficEvidence.js';
 import LinkExperiment from './LinkExperiment.jsx';
 import { createLinkExperiment } from './linkExperiment.js';
+import { behaviorChanged, emptyEditHistory, rememberEdit, sameDesign, travelHistory } from './editorHistory.js';
+import { Redo2 } from 'lucide-react';
 
 const ICONS = { internet: Activity, api: Server, database: Database, cache: Zap, loadBalancer: GitFork, idGenerator: KeyRound, cdn: Cloud };
 const round = n => Math.round(n || 0).toLocaleString();
@@ -128,7 +130,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const [allTools, setAllTools] = useState(false);
   const [notice, setNotice] = useState('');
   const [storageWarning, setStorageWarning] = useState(false);
-  const [undos, setUndos] = useState([]);
+  const [edits, setEdits] = useState(emptyEditHistory);
   const [sim, setSim] = useState({ running: false, paused: false, frames: [], report: null, suite: false });
   const [scrub, setScrub] = useState(null);
   const [trace, setTrace] = useState(null);
@@ -167,17 +169,27 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   }, []);
   useEffect(() => { if (notice) { const id = setTimeout(() => setNotice(''), 6000); return () => clearTimeout(id); } }, [notice]);
 
+  const applyDesign = useCallback(next => {
+    if (behaviorChanged(design, next)) {
+      setTrace(null); setScrub(null); setSelectedEdge(null); setWire(null);
+      setSim({ running: false, paused: false, frames: [], report: null, suite: false });
+    }
+    setDesign(next);
+    setSelected(id => next.nodes.some(n => n.id === id) ? id : 'internet');
+  }, [design]);
   const change = useCallback(next => {
+    if (sim.running || sameDesign(design, next)) return;
+    setEdits(current => rememberEdit(current, design, next));
+    applyDesign(next);
+  }, [design, sim.running, applyDesign]);
+  const travel = useCallback(direction => {
     if (sim.running) return;
-    setUndos(current => [...current.slice(-29), design]);
-    setDesign(next); setTrace(null); setScrub(null); setSelectedEdge(null);
-    setSim({ running: false, paused: false, frames: [], report: null, suite: false });
-  }, [design, sim.running]);
-  const undo = useCallback(() => {
-    if (sim.running || !undos.length) return;
-    setDesign(undos.at(-1)); setUndos(undos.slice(0, -1)); setSelected('internet'); setSelectedEdge(null); setWire(null); setTrace(null); setScrub(null);
-    setSim({ running: false, paused: false, frames: [], report: null, suite: false });
-  }, [sim.running, undos]);
+    const result = travelHistory(edits, design, direction);
+    if (result.design === design) return;
+    setEdits(result.history); applyDesign(result.design);
+  }, [sim.running, edits, design, applyDesign]);
+  const undo = useCallback(() => travel('undo'), [travel]);
+  const redo = useCallback(() => travel('redo'), [travel]);
   const remove = useCallback(id => {
     if (id === 'internet') return;
     change({ nodes: design.nodes.filter(n => n.id !== id), edges: design.edges.filter(e => e.from !== id && e.to !== id) }); setSelected('internet'); setWire(null);
@@ -190,13 +202,18 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   }, [wire, sim.running, design, change]);
   useEffect(() => {
     const key = e => {
-      if (welcome || guide || modelGuide || experimentOpen || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+      if (welcome || guide || modelGuide || experimentOpen || e.target.isContentEditable || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
       if (e.key === 'Escape') { setWire(null); setTrace(null); setSelectedEdge(null); }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
-      if (e.key === 'Delete' && selected && !sim.running) remove(selected);
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+      if (e.ctrlKey && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+      if (e.key === 'Delete' && !sim.running) {
+        const face = e.target.closest('.l1-node-face'), edge = e.target.closest('.l1-edge-tag');
+        if (face) { e.preventDefault(); remove(face.dataset.nodeId); }
+        else if (edge) { e.preventDefault(); change({ ...design, edges: design.edges.filter(item => item.id !== edge.dataset.edgeId) }); }
+      }
     };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
-  }, [welcome, guide, modelGuide, experimentOpen, undo, selected, remove, sim.running]);
+  }, [welcome, guide, modelGuide, experimentOpen, undo, redo, remove, sim.running, change, design]);
 
   useEffect(() => {
     if (!sim.running || sim.paused) return;
@@ -276,7 +293,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   }
   function endDrag() {
     const completed = drag.current;
-    if (completed?.moved) { setUndos(prev => [...prev.slice(-29), completed.before]); suppressClick.current = true; }
+    if (completed?.moved) { setEdits(prev => rememberEdit(prev, completed.before, design)); suppressClick.current = true; }
     drag.current = null;
   }
   const coachText = !design.nodes.some(n => n.type === 'api') ? 'Start with an API. Add it from the workbench below; this is where your link logic runs.' : !design.nodes.some(n => n.type === 'database') ? 'A server can answer a request, but a database remembers the link. Add one next.' : !validation.valid ? 'Connect the calls: choose the round connector on Visitors, then the API. Next connect the API to your database.' : !sim.frames.length ? 'Your design can make a link. Follow one request, or press Send traffic to test its capacity.' : 'Select a component to see its load. Pause traffic if you want time to think.';
@@ -305,14 +322,14 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
       </aside>
 
       <section className="l1-workspace">
-        <div className="l1-board-toolbar"><span><span className="l1-live-dot" />{sim.running ? sim.paused ? 'TRAFFIC PAUSED' : 'LIVE TRAFFIC' : trace ? 'FOLLOW ONE REQUEST' : sim.report ? 'TEST RECORDING' : 'YOUR ARCHITECTURE'}</span><div><button onClick={undo} disabled={!undos.length || sim.running} title="Undo · Ctrl Z" aria-label="Undo last edit"><Undo2 size={16} /></button><button onClick={() => setGuided(g => !g)} className={guided ? 'enabled' : ''} aria-pressed={guided} title="Toggle coach"><BookOpen size={16} /></button></div></div>
+        <div className="l1-board-toolbar"><span><span className="l1-live-dot" />{sim.running ? sim.paused ? 'TRAFFIC PAUSED' : 'LIVE TRAFFIC' : trace ? 'FOLLOW ONE REQUEST' : sim.report ? 'TEST RECORDING' : 'YOUR ARCHITECTURE'}</span><div><button onClick={undo} disabled={!edits.past.length || sim.running} title="Undo · Ctrl Z" aria-label="Undo last edit"><Undo2 size={16} /></button><button onClick={redo} disabled={!edits.future.length || sim.running} title="Redo · Ctrl Shift Z / Ctrl Y" aria-label="Redo last edit"><Redo2 size={16} /></button><button onClick={() => setGuided(g => !g)} className={guided ? 'enabled' : ''} aria-pressed={guided} title="Toggle coach"><BookOpen size={16} /></button></div></div>
         <div className="l1-board-scroll"><div className={`l1-board ${wire ? 'wiring' : ''}`} ref={board} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const type = e.dataTransfer.getData('text/plain'); if (!CATALOG[type]) return; const rect = board.current.getBoundingClientRect(); add(type, { x: bounded((e.clientX - rect.left - 69) / size.width * 100, 2, Math.min(80, (size.width - 150) / size.width * 100)), y: bounded((e.clientY - rect.top - 56) / size.height * 100, 8, 75) }); }}>
           <span className="l1-board-label">A SMALL SYSTEM. ROOM TO GROW.</span><div className="l1-legend"><span><i className="l1-dot read" />Read</span><span><i className="l1-dot write" />Write</span><span><i className="l1-dot reply" />Reply</span></div>
           <TrafficLines design={design} metrics={metrics} running={sim.running && !sim.paused} traceStep={traceStep} size={size} />
           {design.edges.map(edge => {
             const from = design.nodes.find(n => n.id === edge.from), to = design.nodes.find(n => n.id === edge.to);
             const edgeMetric = metrics?.edges[`${edge.from}>${edge.to}`];
-            return <button key={edge.id} className={`l1-edge-tag ${selectedEdge === edge.id ? 'selected' : ''}`} style={{ left: `calc(${(from.x + to.x) / 2}% + 69px)`, top: `calc(${(from.y + to.y) / 2}% + 56px)` }} aria-label={`Inspect connection from ${nameOf(from)} to ${nameOf(to)}`} onClick={() => { setSelectedEdge(edge.id); setTrace(null); }}>
+            return <button key={edge.id} data-edge-id={edge.id} className={`l1-edge-tag ${selectedEdge === edge.id ? 'selected' : ''}`} style={{ left: `calc(${(from.x + to.x) / 2}% + 69px)`, top: `calc(${(from.y + to.y) / 2}% + 56px)` }} aria-label={`Inspect connection from ${nameOf(from)} to ${nameOf(to)}`} onClick={() => { setSelectedEdge(edge.id); setTrace(null); }}>
               {edgeMetric ? `${round(edgeMetric.reads + edgeMetric.writes)}/s` : to.type === 'database' ? 'lookup / save' : to.type === 'cache' ? 'lookup / fill' : to.type === 'idGenerator' ? 'allocate' : 'HTTP'}<span>↔</span></button>;
           })}
           {design.nodes.map(n => {
@@ -320,7 +337,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
             const active = traceStep?.node === n.id, isSelected = selected === n.id;
             const canReceive = wire && !connectionError(design, wire, n.id);
             return <div key={n.id} className={`l1-node ${isSelected ? 'selected' : ''} ${active ? 'trace-active' : ''} ${load?.ratio > 1 ? 'overloaded' : ''} ${wire === n.id ? 'calling' : ''} ${canReceive ? 'can-receive' : ''} shape-${n.type}`} style={{ left: `${n.x}%`, top: `${n.y}%`, '--component': config?.color || '#718e8d' }} onPointerDown={e => beginDrag(e, n)}>
-              <button className="l1-node-face" onClick={() => { if (suppressClick.current) { suppressClick.current = false; return; } wire ? connect(n.id) : setSelected(n.id); }} onKeyDown={e => { if (sim.running || n.type === 'internet' || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return; e.preventDefault(); change({ ...design, nodes: design.nodes.map(item => item.id === n.id ? { ...item, x: bounded(item.x + (e.key === 'ArrowRight' ? 2 : e.key === 'ArrowLeft' ? -2 : 0), 2, 78), y: bounded(item.y + (e.key === 'ArrowDown' ? 2 : e.key === 'ArrowUp' ? -2 : 0), 8, 75) } : item) }); }} aria-label={`Inspect ${nameOf(n)}`}><span className="l1-node-head"><Icon size={25} strokeWidth={1.7} /><span><strong>{config?.short || 'Visitors'}</strong><small>{n.type === 'api' ? STRATEGIES[n.strategy || 'sequence'].short : config?.tiers[n.tier].name || 'The outside world'}</small></span></span><span className="l1-node-readout"><b>{load ? `${round(load.ratio * 100)}%` : n.type === 'internet' ? metrics ? `${round(metrics.rps)}/s` : '100/s' : 'Ready'}</b><small>{load?.rejected ? `${round(load.rejected)} rejected/s` : load ? `${round(load.rate)} ops/s` : config?.verb || 'shorten + redirect'}</small></span><span className="l1-load-track"><i style={{ width: `${Math.min(100, (load?.ratio || 0) * 100)}%` }} /></span></button>
+              <button className="l1-node-face" data-node-id={n.id} onClick={() => { if (suppressClick.current) { suppressClick.current = false; return; } wire ? connect(n.id) : setSelected(n.id); }} onKeyDown={e => { if (sim.running || n.type === 'internet' || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return; e.preventDefault(); change({ ...design, nodes: design.nodes.map(item => item.id === n.id ? { ...item, x: bounded(item.x + (e.key === 'ArrowRight' ? 2 : e.key === 'ArrowLeft' ? -2 : 0), 2, 78), y: bounded(item.y + (e.key === 'ArrowDown' ? 2 : e.key === 'ArrowUp' ? -2 : 0), 8, 75) } : item) }); }} aria-label={`Inspect ${nameOf(n)}`}><span className="l1-node-head"><Icon size={25} strokeWidth={1.7} /><span><strong>{config?.short || 'Visitors'}</strong><small>{n.type === 'api' ? STRATEGIES[n.strategy || 'sequence'].short : config?.tiers[n.tier].name || 'The outside world'}</small></span></span><span className="l1-node-readout"><b>{load ? `${round(load.ratio * 100)}%` : n.type === 'internet' ? metrics ? `${round(metrics.rps)}/s` : '100/s' : 'Ready'}</b><small>{load?.rejected ? `${round(load.rejected)} rejected/s` : load ? `${round(load.rate)} ops/s` : config?.verb || 'shorten + redirect'}</small></span><span className="l1-load-track"><i style={{ width: `${Math.min(100, (load?.ratio || 0) * 100)}%` }} /></span></button>
               {n.type !== 'internet' && <button className="l1-port receive" aria-label={`Connect to ${nameOf(n)}`} title="Called by another service" disabled={!wire || sim.running} onClick={() => connect(n.id)} />}
               {['internet', 'api', 'loadBalancer', 'cdn'].includes(n.type) && <button className="l1-port call" aria-label={`Start call from ${nameOf(n)}`} title="Calls another service · replies automatically" disabled={sim.running} onClick={() => { setWire(w => w === n.id ? null : n.id); setSelected(n.id); setTrace(null); }}><Plus size={10} /></button>}
             </div>;
@@ -355,7 +372,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
             {node.type === 'idGenerator' && !design.nodes.some(n => n.type === 'api' && n.strategy === 'service' && design.edges.some(e => e.from === n.id && e.to === node.id)) && <div className="l1-small-warning">Unused: connect an API and select its ID service strategy.</div>}
             <button className="l1-danger-button" disabled={sim.running} onClick={() => remove(node.id)}><Trash2 size={14} /> Remove component</button>
           </>;
-        })() : <><span className="l1-inspector-illustration"><MousePointer2 size={36} /></span><h2>A system you can explain.</h2><p>Select a component to see its job, tune its capacity, and understand its tradeoffs.</p><div className="l1-callout"><Link2 size={17} /><span>Choose a round <b>+</b> connector, then the service it calls. One wire carries the request and its reply.</span></div><p className="l1-muted">Drag a component to arrange your board. Arrow keys move a focused component. Click a wire label to disconnect it. Undo is always available while building.</p></>}
+        })() : <><span className="l1-inspector-illustration"><MousePointer2 size={36} /></span><h2>A system you can explain.</h2><p>Select a component to see its job, tune its capacity, and understand its tradeoffs.</p><div className="l1-callout"><Link2 size={17} /><span>Choose a round <b>+</b> connector, then the service it calls. One wire carries the request and its reply.</span></div><p className="l1-muted">Drag a component to arrange your board. Arrow keys move a focused component. Click a wire label to disconnect it. Undo and redo work while building. Delete only removes the focused component or connection.</p></>}
         {!trace && metrics && (!sim.running || sim.paused) && <OutcomePicker frame={metrics} design={design} onSelect={inspectOutcome} />}
         {!trace && sim.running && !sim.paused && <p className="l1-muted">Pause traffic to inspect recorded paths, or wait for the test to finish.</p>}
         {!trace && <div className="l1-trace-launch"><div className="l1-section-label">ILLUSTRATIVE WALKTHROUGH</div><div className="l1-segment"><button onClick={() => setTraceKind('read')} className={traceKind === 'read' ? 'active' : ''}>Redirect</button><button onClick={() => setTraceKind('write')} className={traceKind === 'write' ? 'active' : ''}>Create link</button></div>{traceKind === 'read' && <label className="l1-check"><input type="checkbox" checked={traceHot} onChange={e => setTraceHot(e.target.checked)} /> Assume a warm cached entry</label>}<button className="l1-trace-button" disabled={sim.running} onClick={startTrace}><RouteIcon /> Follow one request <ArrowRight size={15} /></button></div>}

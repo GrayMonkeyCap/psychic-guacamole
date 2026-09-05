@@ -56,6 +56,8 @@ The simulated durable table is held in memory for this experiment: it survives p
 
 ## Durable progress
 
+Editor history holds up to thirty in-session design snapshots with undo/redo. Geometry-only operations preserve current recordings, scrubbing and traces; behavioral edits invalidate them. Undoing a behavioral edit restores certification when a matching certificate exists, but does not resurrect discarded run frames. Pointer drags form one history step. New edits clear the redo branch, while no-op edits do not. Delete operates on the focused component/connection only; text fields and dialogs do not invoke board shortcuts.
+
 Save schema is now **3**. The browser key remains `system-sandbox:first-level:v2` deliberately so existing boards are found without moving or deleting user data.
 
 The save contains two separate collections:
