@@ -69,7 +69,11 @@ Both the landing screen and level call `passedChapters` against the same certifi
 
 Schema-2 migration accepts valid original `p99`-shaped summaries and renames that field. Unversioned legacy reports are bound to **frozen identifiers for the original simulator and scenarios**, never to whatever the current constants happen to be in a future release. Explicit older versions are preserved. Schema 3 does not silently reconstruct missing certificates from history or assume that unversioned evidence is current.
 
-Migration can preserve only evidence that still exists. Passes already evicted by an older build cannot be recovered from no record. Certificates also consume storage; storage-failure recovery, portable backups and duplicate-tab conflict handling remain open work. The existing interface warns if browser storage cannot be written. Cross-device or account persistence is not provided.
+Migration can preserve only evidence that still exists. Passes already evicted by an older build cannot be recovered from no record. Versioned portable JSON backups preserve the board/settings/certificates, exclude session experiment data and traffic frames, and accept raw schema-2/3 saves. Imports are size-limited, validated, previewed and explicitly confirmed.
+
+Participating tabs coordinate compare-and-write using the browser Web Locks API. A stale tab pauses autosave and retains its local board; explicit conflict resolution can load the saved copy or replace it after saving a recovery checkpoint. A source changed since review aborts the replacement. Changed autosaves checkpoint the previous valid save, while no-op writes do not discard recovery. Unknown/corrupt primary data is not automatically overwritten; explicit replacement first preserves its original bytes under `system-sandbox:first-level:protected-original`. Recovery and protected-original slots each retain only their latest copy; download files for durable branches.
+
+Unavailable storage or Web Locks disables automatic writes, displays an unsaved warning and leaves file export usable. Restoring requires successful checkpoint/primary writes. A retry action is available; keep the tab open or export before leaving while unsaved. The coordination protocol cannot constrain older builds or outside scripts that ignore its lock. Clearing browser data removes all browser-local slots. Cross-device/account persistence, browser-crash guarantees and automatic conflict merging are not provided.
 
 ## Verification for this slice
 
@@ -84,4 +88,4 @@ Run `npm test` and `npm run build`.
 
 `scripts/verify-outcomes.mjs` checks pause/resume, filters, recorded miss/hit paths, scrubbing, editing invalidation and actual rejection feedback in an isolated browser context. `scripts/verify-link-experiment.mjs` checks create/open, cache loss, collision protection, modal focus, close/reopen, reset confirmation and absence of URL requests/persistence. Both check mobile overflow. Pass the bundled Playwright package directory as their argument, as with the existing browser scripts.
 
-77 unit/static-render tests and both new browser scripts pass as of 6 September 2026; the production build succeeds. These checks do not establish novice learning, full assistive-technology access or comprehensive visual QA. The broader backlog readiness gate remains open.
+108 unit/static-render tests pass as of 6 September 2026; the production build succeeds. Additional browser scripts cover edit history, connection previews, contextual help, portable backups and two-tab/blocked-storage behavior. These checks do not establish novice learning, full assistive-technology access or comprehensive visual QA. The broader backlog readiness gate remains open.
