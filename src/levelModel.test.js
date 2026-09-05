@@ -38,7 +38,8 @@ describe('first level: architecture physics', () => {
     expect(runChapter(basic(), CHAPTERS[0]).passed).toBe(true);
     const viral = runChapter(basic(), CHAPTERS[1]);
     expect(viral.passed).toBe(false);
-    expect(viral.bottleneck).toBe('db');
+    expect(viral.bottleneck).toBe('api');
+    expect(viral.reason).toContain('API server rejected');
   });
   it('unused capacity does not affect traffic', () => {
     const d = basic();
@@ -69,13 +70,15 @@ describe('first level: architecture physics', () => {
     expect(warm.loads.db.reads).toBeLessThan(cold.loads.db.reads / 5);
     expect(warm.loads.db.writes).toBe(cold.loads.db.writes);
   });
-  it('queue pressure accumulates and recovers after demand falls', () => {
+  it('fail-fast overload rejects work without a phantom queue, then recovers at low demand', () => {
     let high;
     for (let i = 0; i < 6; i++) high = tick(basic(), CHAPTERS[1], 10, high);
-    expect(high.loads.db.queue).toBeGreaterThan(0);
+    expect(high.loads.db.queue).toBe(0);
+    expect(high.accounting.rejected).toBeGreaterThan(0);
     let low = high;
     for (let i = 0; i < 10; i++) low = tick(basic(), CHAPTERS[0], 10, low);
     expect(low.loads.db.queue).toBe(0);
+    expect(low.accounting.rejected).toBeCloseTo(0);
   });
   it('a connected but unused ID service has no traffic or penalty to success', () => {
     const d = basic();

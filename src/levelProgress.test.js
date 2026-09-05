@@ -79,7 +79,9 @@ describe('durable, versioned Level 1 certification', () => {
     expect(loaded.guided).toBe(false);
     expect(loaded.chapter).toBe(2);
     expect(loaded.unlocked).toBe(2);
-    expect(passedChapters(loaded.certificates, design)).toEqual([true, true, true]);
+    expect(loaded.certificates).toHaveLength(3);
+    expect(loaded.certificates.every(c => c.modelVersion === 'aggregate-v1')).toBe(true);
+    expect(passedChapters(loaded.certificates, design)).toEqual([false, false, false]);
     expect(loaded.history[0].p99).toBeUndefined();
     expect(loaded.history[0].estimatedLatencyMs).toBe(summaries[0].estimatedLatencyMs);
     expect(restore(loaded)).toEqual(loaded);
@@ -88,7 +90,8 @@ describe('durable, versioned Level 1 certification', () => {
     const failures = Array.from({ length: 20 }, () => ({ ...legacy()[0], passed: false, maxError: 50 }));
     const loaded = restore(save({ version: 2, certificates: undefined, history: [...legacy(), ...failures] }));
     expect(loaded.history).toHaveLength(12);
-    expect(passedChapters(loaded.certificates, design)).toEqual([true, true, true]);
+    expect(loaded.certificates).toHaveLength(3);
+    expect(passedChapters(loaded.certificates, design)).toEqual([false, false, false]);
   });
   it('never stamps unversioned v3 records with current rules or rebuilds its ledger from history', () => {
     const { modelVersion, ...partial } = summaries[0];
@@ -112,6 +115,12 @@ describe('durable, versioned Level 1 certification', () => {
 });
 
 describe('explicit game metric contract', () => {
+  it('preserves unavailable latency on failed reports without inventing a certificate', () => {
+    const failed = { ...summaries[0], passed: false, maxError: 100, estimatedLatencyMs: null };
+    const loaded = restore(save({ history: [failed], certificates: [failed] }));
+    expect(loaded.history[0].estimatedLatencyMs).toBeNull();
+    expect(loaded.certificates).toEqual([]);
+  });
   it('uses inclusive published thresholds, rejecting each exceeded threshold and nonfinite values', () => {
     const boundary = { maxError: CONTRACT_RULES.maxError, estimatedLatencyMs: CONTRACT_RULES.maxLatencyMs, cost: CONTRACT_RULES.budget };
     expect(meetsMetricContract(boundary)).toBe(true);

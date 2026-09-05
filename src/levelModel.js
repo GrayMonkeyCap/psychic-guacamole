@@ -1,8 +1,10 @@
+import { simulateTraffic } from './trafficModel.js';
+
 // Deliberately small, deterministic teaching model. Capacities and costs are game units.
 export const LIMIT = 900;
 export const EFFICIENCY_TARGET = 650;
 // Bump when simulation/validation semantics change, not for presentation-only edits.
-export const MODEL_VERSION = 'aggregate-v1';
+export const MODEL_VERSION = 'admission-v2';
 export const SAVE_VERSION = 3;
 // Keep the existing storage key so an upgrade finds the player's board.
 export const SAVE_KEY = 'system-sandbox:first-level:v2';
@@ -141,91 +143,8 @@ export function trafficAt(chapter, time) {
   return chapter.peak * (.08 + .92 * Math.min(1, time / 5));
 }
 export function tick(design, chapter, time, previous = {}, dt = .2) {
-  previous ||= {};
-  const validation = validate(design), map = Object.fromEntries(design.nodes.map(n => [n.id, n]));
-  const rps = trafficAt(chapter, time), reads = rps * chapter.reads, writes = rps - reads;
-  const loads = {}, edges = {}, paths = [], warmth = { ...(previous.warmth || {}) };
-  const deps = id => design.edges.filter(e => e.from === id).map(e => map[e.to]).filter(Boolean);
-  const edgeLoad = (from, to, read, write) => {
-    const key = `${from}>${to}`;
-    edges[key] ||= { reads: 0, writes: 0 };
-    edges[key].reads += read; edges[key].writes += write;
-  };
-  const demand = (node, read, write, extra = 0) => {
-    loads[node.id] ||= { reads: 0, writes: 0, extra: 0, hits: 0 };
-    loads[node.id].reads += read; loads[node.id].writes += write; loads[node.id].extra += extra;
-  };
-  const cacheReads = (node, read) => {
-    const tier = CATALOG[node.type].tiers[node.tier];
-    const warm = warmth[node.id] || 0;
-    const hitRate = (chapter.hot + (1 - chapter.hot) * tier.coverage * .25) * warm;
-    const hits = Math.min(read * hitRate, tier.capacity);
-    warmth[node.id] = Math.min(1, 1 - (1 - warm) * Math.exp(-read * dt / 120));
-    demand(node, read, 0);
-    loads[node.id].hits += hits;
-    return hits;
-  };
-  const route = (node, read, write, chain = []) => {
-    if (!node || chain.includes(node.id)) return;
-    const next = [...chain, node.id];
-    if (node.type === 'internet' || node.type === 'loadBalancer' || node.type === 'cdn') {
-      let originReads = read;
-      if (node.type === 'cdn') {
-        const hits = cacheReads(node, read); originReads -= hits;
-        if (hits) paths.push({ rate: hits, chain: next, kind: 'read' });
-        demand(node, 0, write);
-      } else if (node.type !== 'internet') demand(node, read, write);
-      const targets = deps(node.id);
-      for (const target of targets) {
-        const rr = originReads / targets.length, ww = write / targets.length;
-        edgeLoad(node.id, target.id, rr, ww); route(target, rr, ww, next);
-      }
-      return;
-    }
-    if (node.type !== 'api') return;
-    const policy = STRATEGIES[node.strategy || 'sequence'] || STRATEGIES.sequence;
-    demand(node, read, write, write * policy.cpu);
-    const targets = deps(node.id), db = targets.find(n => n.type === 'database'), cache = targets.find(n => n.type === 'cache'), id = targets.find(n => n.type === 'idGenerator');
-    let misses = read;
-    if (cache) {
-      edgeLoad(node.id, cache.id, read, 0);
-      const hits = cacheReads(cache, read); misses -= hits;
-      if (hits) paths.push({ rate: hits, chain: [...next, cache.id], kind: 'read' });
-    }
-    if (db) {
-      demand(db, misses, write * policy.db); edgeLoad(node.id, db.id, misses, write);
-      // Filling a missed entry is a cache write, performed by the API after a DB result.
-      if (cache) { demand(cache, 0, misses); edgeLoad(node.id, cache.id, 0, misses); }
-      if (misses) paths.push({ rate: misses, chain: [...next, ...(cache ? [cache.id] : []), db.id], kind: 'read' });
-      if (write) paths.push({ rate: write, chain: [...next, ...(node.strategy === 'service' && id ? [id.id] : []), db.id], kind: 'write' });
-    }
-    if (node.strategy === 'service' && id) { demand(id, 0, write); edgeLoad(node.id, id.id, 0, write); }
-  };
-  route(map.internet, reads, writes);
-  for (const [id, load] of Object.entries(loads)) {
-    const node = map[id], tier = CATALOG[node.type].tiers[node.tier];
-    const ratio = node.type === 'database' ? load.reads / tier.capacity + load.writes / tier.writes : (load.reads + load.writes + load.extra) / tier.capacity;
-    const queueSeconds = Math.max(0, Math.min(.8, (previous.loads?.[id]?.queueSeconds || 0) + (ratio - 1) * dt));
-    Object.assign(load, { ratio, rate: load.reads + load.writes, capacity: tier.capacity, queueSeconds,
-      queue: Math.round(queueSeconds * tier.capacity), latency: (node.type === 'database' ? 14 : 3) + queueSeconds * 1000 + 4 * ratio * ratio,
-      served: ratio > 1 ? 1 / ratio : 1 });
-  }
-  let successes = 0;
-  const latencies = [];
-  for (const path of paths) {
-    const resources = path.chain.map(id => loads[id]).filter(Boolean);
-    const served = Math.min(1, ...resources.map(l => l.served));
-    successes += path.rate * served;
-    latencies.push({ latency: 18 + resources.reduce((n, l) => n + l.latency, 0), rate: path.rate });
-  }
-  latencies.sort((a, b) => a.latency - b.latency);
-  let cumulative = 0, estimatedLatencyMs = 0;
-  for (const sample of latencies) { cumulative += sample.rate; estimatedLatencyMs = sample.latency; if (cumulative >= rps * .99) break; }
-  const hottest = Object.entries(loads).sort((a, b) => b[1].ratio - a[1].ratio)[0];
-  const errorRate = validation.valid ? Math.max(0, Math.min(100, 100 * (1 - successes / Math.max(1, rps)))) : 100;
-  const cacheHits = Object.values(loads).reduce((sum, l) => sum + l.hits, 0);
-  return { time, rps, reads, writes, loads, edges, warmth, estimatedLatencyMs: Math.round(estimatedLatencyMs), errorRate,
-    cacheHit: reads ? cacheHits / reads * 100 : 0, hottest: hottest?.[0], validation };
+  return simulateTraffic({ design, chapter, time, previous: previous || {}, dt, catalog: CATALOG,
+    strategies: STRATEGIES, validation: validate(design), rps: trafficAt(chapter, time) });
 }
 export function runChapter(design, chapter) {
   let state;
@@ -234,15 +153,25 @@ export function runChapter(design, chapter) {
   return report(design, chapter, frames);
 }
 export function report(design, chapter, frames) {
-  const worst = frames.reduce((a, b) => b.errorRate + b.estimatedLatencyMs / 100 > a.errorRate + a.estimatedLatencyMs / 100 ? b : a, frames[0]);
-  const maxError = Math.max(...frames.map(f => f.errorRate)), estimatedLatencyMs = Math.max(...frames.map(f => f.estimatedLatencyMs));
+  const maxError = frames.length ? Math.max(...frames.map(f => f.errorRate)) : 100;
+  const latencies = frames.map(f => f.estimatedLatencyMs).filter(Number.isFinite);
+  const estimatedLatencyMs = latencies.length ? Math.max(...latencies) : null;
+  const worstIndex = frames.reduce((index, frame, i) => {
+    const selected = frames[index];
+    if (maxError > CONTRACT_RULES.maxError) return frame.errorRate > selected.errorRate ? i : index;
+    return (frame.estimatedLatencyMs ?? -1) > (selected.estimatedLatencyMs ?? -1) ? i : index;
+  }, 0);
+  const worst = frames[worstIndex];
   const cost = costOf(design.nodes), valid = validate(design).valid;
   const passed = valid && meetsMetricContract({ cost, maxError, estimatedLatencyMs });
-  const bottleneck = design.nodes.find(n => n.id === worst?.hottest);
+  const bottleneck = design.nodes.find(n => n.id === worst?.bottleneck);
   const load = worst?.loads?.[bottleneck?.id];
-  const reason = !valid ? validate(design).issues[0].text : cost > LIMIT ? `The design works outside the contract: $${cost} exceeds the $${LIMIT} monthly budget.` : !passed && bottleneck ? `${CATALOG[bottleneck.type].name} reached ${Math.round(load.ratio * 100)}% of its capacity. ${Math.round(load.reads).toLocaleString()} read and ${Math.round(load.writes).toLocaleString()} write operations per second competed for its resources.` : chapter.takeaway;
+  const blocked = worst?.outcomes?.filter(o => o.blockedBy === bottleneck?.id) || [];
+  const rejectedReads = blocked.filter(o => o.kind === 'read').reduce((sum, o) => sum + o.rate, 0);
+  const rejectedWrites = blocked.filter(o => o.kind === 'write').reduce((sum, o) => sum + o.rate, 0);
+  const reason = !valid ? validate(design).issues[0].text : cost > LIMIT ? `The design costs $${cost}, exceeding the $${LIMIT} monthly budget.` : !passed && bottleneck && load ? `${CATALOG[bottleneck.type].name} rejected ${Math.round(rejectedReads).toLocaleString()} redirects and ${Math.round(rejectedWrites).toLocaleString()} creations per second in the worst sample. Those requests stopped here; they did not call another dependency. Other components may also reject work—inspect their counts.` : !passed ? 'No qualifying completed test is available. Run the full traffic challenge and inspect its results.' : chapter.takeaway;
   const alternatives = bottleneck?.type === 'database' ? chapter.id === 1 ? 'Try reusing popular reads with a cache, or give storage more capacity. Check whether the API also needs room.' : 'Compare database capacity and the API’s code strategy. Caching does not remove durable writes.' : bottleneck?.type === 'api' ? 'Compare a larger API, replicas behind a balancer, or an edge cache that answers before the API.' : 'Inspect the highlighted component and its dependencies. More capacity and a different request path have different costs.';
-  return { chapter: chapter.id, passed, estimatedLatencyMs, maxError, cost, reason, alternatives, bottleneck: bottleneck?.id, frames, fingerprint: fingerprint(design), modelVersion: MODEL_VERSION, scenarioVersion: scenarioVersion(chapter) };
+  return { chapter: chapter.id, passed, estimatedLatencyMs, maxError, cost, reason, alternatives, bottleneck: bottleneck?.id, worstIndex, frames, fingerprint: fingerprint(design), modelVersion: MODEL_VERSION, scenarioVersion: scenarioVersion(chapter) };
 }
 export function traceRequest(design, kind = 'read', hot = false) {
   const validation = validate(design);
@@ -297,8 +226,8 @@ export function restoreSave(raw) {
       if (!r || !Number.isInteger(r.chapter) || !CHAPTERS[r.chapter] || typeof r.passed !== 'boolean'
         || !Number.isFinite(r.cost) || r.cost < 0 || !Number.isFinite(r.maxError) || r.maxError < 0 || r.maxError > 100
         || typeof r.fingerprint !== 'string' || r.fingerprint.length > 40000) return null;
-      const estimatedLatencyMs = r.estimatedLatencyMs ?? (save.version === 2 ? r.p99 : undefined);
-      if (!Number.isFinite(estimatedLatencyMs) || estimatedLatencyMs < 0) return null;
+      const estimatedLatencyMs = r.estimatedLatencyMs !== undefined ? r.estimatedLatencyMs : (save.version === 2 ? r.p99 : undefined);
+      if (!(estimatedLatencyMs === null && r.passed === false) && (!Number.isFinite(estimatedLatencyMs) || estimatedLatencyMs < 0)) return null;
       const legacy = save.version === 2 && r.modelVersion == null && r.scenarioVersion == null;
       const modelVersion = legacy ? LEGACY_MODEL_VERSION : r.modelVersion;
       const scenario = legacy ? LEGACY_SCENARIOS[r.chapter] : r.scenarioVersion;

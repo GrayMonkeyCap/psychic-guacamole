@@ -125,6 +125,8 @@ Verification for this slice: **38 tests passing; production build successful.** 
 
 ### Priority and acceptance rules
 
+**Second engineering slice · 5 September 2026:** `admission-v2` replaces the offered-demand approximation. L1-001 now has a tested fail-fast/zero-queue implementation with per-operation conservation; L1-002 batches shared-cache lookups and warms only from successful admitted fills. These are implemented under the explicit no-waiting policy, not a claim to simulate production queues. L1-005 is partial: reports identify actual rejected operation counts and locations, but individual recorded-request inspection remains open (L1-003). The HUD exposes admitted/rejected rates and successful/skipped fills. Original-model passes are retained and marked for recertification. **52 tests pass; production build succeeds.** New browser-interaction, accessibility and learner qualification remain open. The audit and balance table above are historical `aggregate-v1` observations, not results for the new model.
+
 Each ticket has an acceptance condition, not merely a feature name. Before implementation, assign an owner and refine estimates using the current architecture.
 
 - **P0 — trust/release blocker:** Wrong lessons, lost evidence, inaccessible core actions or missing release evidence.

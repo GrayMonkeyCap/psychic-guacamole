@@ -7,6 +7,9 @@
 .l1-dialog.l1-model-guide p, .l1-model-guide dd { font-size: 1rem; line-height: 1.55; color: #526c57; }
 .l1-model-guide dt { margin-top: 1.2rem; font-size: 1rem; font-weight: 700; }
 .l1-model-guide dd { margin: .4rem 0 0; }
+.l1-accounting { margin: 18px 0; padding: 14px; border: 1px solid var(--stroke); border-radius: 12px; background: #f5efd9; }
+.l1-accounting > div:not(.l1-section-label) { display: flex; justify-content: space-between; gap: 12px; margin-top: 7px; font-size: 14px; }
+.l1-accounting p { margin: 12px 0 0; font-size: 14px; line-height: 1.5; }
 .l1-shell button:focus-visible, .l1-shell select:focus-visible, .l1-shell input:focus-visible { outline: 3px solid #287e9c; outline-offset: 3px; }
 .l1-shell small, .l1-eyebrow, .l1-section-label { font-family: 'DM Mono', monospace; }
 .l1-header { gap: 18px; padding: 12px 22px; grid-template-columns: auto 1fr auto; }

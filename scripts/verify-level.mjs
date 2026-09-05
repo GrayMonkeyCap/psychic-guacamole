@@ -36,7 +36,7 @@ await page.getByRole('button', { name: 'Next challenge', exact: true }).click();
 await page.getByRole('button', { name: 'Send traffic', exact: true }).click();
 await page.getByText('A USEFUL FAILURE', { exact: true }).waitFor({ timeout: 22000 });
 await page.screenshot({ path: 'artifacts/first-level-failure.png', fullPage: true });
-assert.ok((await page.locator('.l1-result-explanation').innerText()).includes('Database reached'));
+assert.ok((await page.locator('.l1-result-explanation').innerText()).includes('API server rejected'));
 await page.reload();
 await page.getByRole('button', { name: 'Inspect API server', exact: true }).waitFor();
 assert.equal(await page.getByRole('dialog').count(), 0);

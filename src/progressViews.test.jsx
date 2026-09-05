@@ -31,9 +31,11 @@ describe('landing and level consume the same durable progress', () => {
     expect(render(save({ certificates: old }))).toContain('Earlier-rule passes are saved');
     expect(render(save({ certificates: old }), true)).toContain('Earlier-rule passes are kept');
   });
-  it('shows the same completion after migration from original p99-shaped v2 records', () => {
+  it('preserves original-model progress but asks for recertification after the model change', () => {
     const history = summaries.map(({ estimatedLatencyMs, modelVersion, scenarioVersion, ...r }) => ({ ...r, p99: estimatedLatencyMs }));
-    expect(render(save({ version: 2, certificates: undefined, history }))).toContain('CONTRACT COMPLETE');
+    const markup = render(save({ version: 2, certificates: undefined, history }));
+    expect(markup).not.toContain('CONTRACT COMPLETE');
+    expect(markup).toContain('Earlier-rule passes are saved');
   });
   it('explains the metric name and per-sample success without presenting measured p99', () => {
     const markup = render(save(), true);
