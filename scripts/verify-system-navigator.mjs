@@ -47,7 +47,8 @@ try {
   assert.ok(await nav.getByRole('button', { name: 'Start call from API server 1', exact: true }).isDisabled());
   await page.getByRole('button', { name: 'Pause traffic', exact: true }).click();
   assert.ok((await nav.innerText()).includes('admitted/s'));
-  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'End run', exact: true }).click();
+  await page.getByRole('button', { name: 'End run & edit', exact: true }).click();
   await nav.getByRole('button', { name: 'Close system list' }).click();
   assert.ok(await page.getByRole('button', { name: 'System list', exact: true }).evaluate(el => el === document.activeElement));
   for (const width of [320, 768]) {

@@ -21,6 +21,7 @@ import StructureReview, { LocalStructureIssues } from './StructureReview.jsx';
 import SystemNavigator from './SystemNavigator.jsx';
 import { useTrafficMotion } from './motionPreferences.js';
 import { advancePlaybackRun, createPlaybackRun, playbackDelay } from './playback.js';
+import { playbackMode, stopPlayback } from './playbackMode.js';
 
 const ICONS = { internet: Activity, api: Server, database: Database, cache: Zap, loadBalancer: GitFork, idGenerator: KeyRound, cdn: Cloud };
 const round = n => Math.round(n || 0).toLocaleString();
@@ -158,6 +159,8 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const [edits, setEdits] = useState(emptyEditHistory);
   const [sim, setSim] = useState({ running: false, paused: false, frames: [], report: null, suite: false });
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [stopConfirm, setStopConfirm] = useState(false);
+  const runButton = useRef(null);
   const resultsPanel = useRef(null);
   const [scrub, setScrub] = useState(null);
   const [trace, setTrace] = useState(null);
@@ -175,6 +178,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const cost = costOf(design.nodes);
   const node = design.nodes.find(n => n.id === selected);
   const metrics = sim.frames[scrub ?? sim.frames.length - 1];
+  const mode = playbackMode(sim);
   const traceStep = trace?.steps[trace.index];
   const help = contextualHelp(design, chapter, sim.report, sim.report ? sim.frames[sim.report.worstIndex] : metrics);
   const helpStep = helpSteps[help.key] ?? -1;
@@ -187,6 +191,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const closeModelGuide = useCallback(() => setModelGuide(false), []);
   const closeExperiment = useCallback(() => setExperimentOpen(false), []);
   const closeBackups = useCallback(() => setBackupsOpen(false), []);
+  const closeStopConfirm = useCallback(() => setStopConfirm(false), []);
   const currentSave = { version: SAVE_VERSION, design, chapter: chapterId, unlocked, guided, history, certificates };
   async function retrySave() {
     const revision = ++saveRevision.current;
@@ -280,7 +285,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   }, [wire, sim.running, design, change]);
   useEffect(() => {
     const key = e => {
-      if (welcome || guide || modelGuide || experimentOpen || backupsOpen || e.target.isContentEditable || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+      if (welcome || guide || modelGuide || experimentOpen || backupsOpen || stopConfirm || e.target.isContentEditable || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
       if (e.key === 'Escape') {
         setWire(null); setMoveTarget(null); setTrace(null); setSelectedEdge(null);
         if (navigatorOpen) { setNavigatorOpen(false); navigatorTrigger.current?.focus(); }
@@ -295,7 +300,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
       }
     };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
-  }, [welcome, guide, modelGuide, experimentOpen, backupsOpen, undo, redo, remove, sim.running, change, design, navigatorOpen, recapOpen]);
+  }, [welcome, guide, modelGuide, experimentOpen, backupsOpen, stopConfirm, undo, redo, remove, sim.running, change, design, navigatorOpen, recapOpen]);
 
   const advancePlayback = useCallback((keepPaused = false) => {
     const run = timerState.current, event = advancePlaybackRun(run);
@@ -340,6 +345,18 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
     timerState.current = createPlaybackRun(design, id, suite);
     setChapterId(id); setWire(null); setMoveTarget(null); setTrace(null); setScrub(null);
     setSim({ running: true, paused: false, frames: [], report: null, suite });
+  }
+  function requestStop() {
+    if (!sim.running) return;
+    setSim(current => ({ ...current, paused: true }));
+    setStopConfirm(true);
+  }
+  function confirmStop() {
+    timerState.current = null;
+    setSim(stopPlayback);
+    setStopConfirm(false);
+    setNotice('Run ended without grading this challenge. Captured samples remain until a behavior change or another test. Earned passes are unchanged.');
+    requestAnimationFrame(() => runButton.current?.focus());
   }
   function add(type, point) {
     if (sim.running) return;
@@ -449,7 +466,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
       </aside>
 
       <section className="l1-workspace" onClickCapture={() => { setRecapOpen(false); setNavigatorOpen(false); }}>
-        <div className="l1-board-toolbar"><span><span className="l1-live-dot" />{sim.running ? sim.paused ? 'TRAFFIC PAUSED' : 'LIVE TRAFFIC' : trace ? 'FOLLOW ONE REQUEST' : sim.report ? 'TEST RECORDING' : 'YOUR ARCHITECTURE'}</span><div><button ref={navigatorTrigger} onClick={() => navigatorOpen ? setNavigatorOpen(false) : openNavigator()} aria-expanded={navigatorOpen} aria-controls="l1-system-navigator">System list</button><button onClick={undo} disabled={!edits.past.length || sim.running} title="Undo · Ctrl Z" aria-label="Undo last edit"><Undo2 size={16} /></button><button onClick={redo} disabled={!edits.future.length || sim.running} title="Redo · Ctrl Shift Z / Ctrl Y" aria-label="Redo last edit"><Redo2 size={16} /></button><button onClick={() => setGuided(g => !g)} className={guided ? 'enabled' : ''} aria-pressed={guided} title="Toggle coach"><BookOpen size={16} /></button></div></div>
+        <div className="l1-board-toolbar"><span><span className="l1-live-dot" />{!sim.running && trace ? 'FOLLOW ONE REQUEST' : mode.label}</span><div><button ref={navigatorTrigger} onClick={() => navigatorOpen ? setNavigatorOpen(false) : openNavigator()} aria-expanded={navigatorOpen} aria-controls="l1-system-navigator">System list</button><button onClick={undo} disabled={!edits.past.length || sim.running} title="Undo · Ctrl Z" aria-label="Undo last edit"><Undo2 size={16} /></button><button onClick={redo} disabled={!edits.future.length || sim.running} title="Redo · Ctrl Shift Z / Ctrl Y" aria-label="Redo last edit"><Redo2 size={16} /></button><button onClick={() => setGuided(g => !g)} className={guided ? 'enabled' : ''} aria-pressed={guided} title="Toggle coach"><BookOpen size={16} /></button></div></div>
         <div className="l1-board-scroll"><div className={`l1-board ${wire ? 'wiring' : ''} ${moveTarget ? 'placing' : ''}`} ref={board} onClick={placeSelected} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const type = e.dataTransfer.getData('text/plain'); if (!CATALOG[type]) return; const rect = board.current.getBoundingClientRect(); add(type, { x: bounded((e.clientX - rect.left - 69) / size.width * 100, 2, Math.min(80, (size.width - 150) / size.width * 100)), y: bounded((e.clientY - rect.top - 56) / size.height * 100, 8, 75) }); }}>
           <span className="l1-board-label">A SMALL SYSTEM. ROOM TO GROW.</span><div className="l1-legend"><span><i className="l1-dot read" />Read</span><span><i className="l1-dot write" />Write</span><span><i className="l1-dot reply" />Reply</span></div>
           <TrafficLines animated={motion.animated} design={design} metrics={metrics} running={sim.running && !sim.paused} traceStep={traceStep} size={size} />
@@ -526,13 +543,14 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
     </section>}
 
     <footer className="l1-controls">
-      <div className="l1-system-state"><span className={`l1-status-orb ${metrics && (metrics.errorRate > CONTRACT_RULES.maxError || metrics.estimatedLatencyMs > CONTRACT_RULES.maxLatencyMs) ? 'danger' : sim.running ? 'live' : ''}`} /><div><small>{sim.running ? sim.suite ? 'FULL CONTRACT TEST' : 'TRAFFIC TEST' : sim.report ? 'REPLAY & INSPECT' : 'BUILD MODE'}</small><strong>{sim.running ? sim.paused ? 'Paused. Take a look.' : `${chapter.name} · ${(metrics?.time || 0).toFixed(0)} / ${chapter.duration}s` : sim.report ? 'Drag the timeline to inspect' : validation.valid ? 'Ready for visitors' : 'Connect your first system'}</strong></div></div>
+      <div className="l1-system-state" data-mode={mode.id}><span aria-hidden="true" className={`l1-status-orb ${metrics && (metrics.errorRate > CONTRACT_RULES.maxError || metrics.estimatedLatencyMs > CONTRACT_RULES.maxLatencyMs) ? 'danger' : sim.running ? 'live' : ''}`} /><div><div role="status" aria-live="polite" aria-atomic="true"><small>{mode.label}{sim.running && sim.suite ? ' · ALL THREE' : ''}</small><p className="l1-mode-hint">{mode.hint}</p></div><strong>{sim.running || sim.frames.length ? `${sim.paused ? 'Paused at' : 'Sample'} ${(metrics?.time || 0).toFixed(1)} / ${chapter.duration}s` : validation.valid ? 'Ready for visitors' : 'Connect your first system'}</strong></div></div>
       <div className="l1-metrics"><div><small>INCOMING</small><strong>{metrics ? round(metrics.rps) : '—'}<i>/s</i></strong></div><div className={metrics?.estimatedLatencyMs > CONTRACT_RULES.maxLatencyMs ? 'bad' : ''}><small>EST. LATENCY</small><strong>{metrics?.estimatedLatencyMs ?? '—'}<i>ms</i></strong></div><div className={metrics?.errorRate > CONTRACT_RULES.maxError ? 'bad' : ''}><small>SUCCESS</small><strong>{metrics ? (100 - metrics.errorRate).toFixed(1) : '—'}<i>%</i></strong></div></div>
-      <Plot frames={sim.frames} index={scrub} onScrub={!sim.running && sim.frames.length ? index => { setTrace(null); setScrub(index); } : undefined} />
-      <div className="l1-run-buttons">{sim.running ? <><button className="l1-secondary" onClick={() => { setTrace(null); setSim(s => ({ ...s, paused: !s.paused })); }} aria-label={sim.paused ? 'Resume traffic' : 'Pause traffic'}>{sim.paused ? <Play size={18} /> : <Pause size={18} />}</button>{sim.paused && <button className="l1-secondary" onClick={() => advancePlayback(true)}>Step 0.2s</button>}<button className="l1-secondary" onClick={() => { timerState.current = null; setSim(s => ({ ...s, running: false, paused: false })); }} title="Stop test and edit">Edit <X size={16} /></button></> : <><button className="l1-secondary" disabled={unlocked < 2} onClick={() => start(true)} title={unlocked < 2 ? 'Complete the challenges to unlock full-contract testing' : 'Test this design against all three challenges'}><SkipForward size={16} /><span>All three</span></button><button className="l1-primary" onClick={() => start(false)}><Play size={18} fill="currentColor" />{sim.frames.length ? 'Try again' : 'Send traffic'}</button></>}</div>
+      <Plot frames={sim.frames} index={scrub} onScrub={(!sim.running || sim.paused) && sim.frames.length ? index => { setTrace(null); setScrub(index); } : undefined} />
+      <div className="l1-run-buttons">{sim.running ? <><button className="l1-secondary" onClick={() => { setTrace(null); setScrub(null); setSim(s => ({ ...s, paused: !s.paused })); }} aria-label={sim.paused ? 'Resume traffic' : 'Pause traffic'}>{sim.paused ? <Play size={18} /> : <Pause size={18} />}</button>{sim.paused && <button className="l1-secondary" onClick={() => advancePlayback(true)}>Step 0.2s</button>}<button className="l1-secondary" onClick={requestStop} title="Pause and review before ending the test">End run <X size={16} /></button></> : <><button className="l1-secondary" disabled={unlocked < 2} onClick={() => start(true)} title={unlocked < 2 ? 'Complete the challenges to unlock full-contract testing' : 'Test this design against all three challenges'}><SkipForward size={16} /><span>All three</span></button><button ref={runButton} className="l1-primary" onClick={() => start(false)}><Play size={18} fill="currentColor" />{sim.frames.length ? 'Try again' : 'Send traffic'}</button></>}</div>
     </footer>
     {notice && <div className="l1-notice" role="alert"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss message"><X size={18} /></button></div>}
     {welcome && <Briefing onClose={closeWelcome} />}
+    {stopConfirm && <StopRunDialog onClose={closeStopConfirm} onConfirm={confirmStop} sampleCount={sim.frames.length} suite={sim.suite} />}
     {guide && <Guide type={guide} onClose={closeGuide} />}
     {modelGuide && <ModelGuide onClose={closeModelGuide} />}
     {experimentOpen && <LinkExperimentDialog design={design} state={experimentState} onChange={setExperimentState} onClose={closeExperiment} />}
@@ -541,6 +559,18 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
 }
 
 function RouteIcon() { return <GitFork size={15} />; }
+
+function StopRunDialog({ onClose, onConfirm, sampleCount, suite }) {
+  const ref = useRef(null);
+  useFocusDialog(ref, onClose);
+  return <div className="l1-shade"><section ref={ref} className="l1-dialog l1-model-guide" role="dialog" aria-modal="true" aria-labelledby="stop-run-title">
+    <button className="l1-text-button" onClick={onClose}>Keep paused</button>
+    <h2 id="stop-run-title">End this run and edit?</h2>
+    <p>Traffic is paused. Ending now does not grade this challenge or award a pass.{suite ? ' Any remaining challenges in this run will not execute.' : ''} Passes already earned stay yours.</p>
+    <p>{sampleCount ? `${sampleCount} captured samples will remain available to inspect. Moving components preserves them; changing behavior or starting another test clears this recording.` : 'No traffic samples have been captured yet.'} Recordings are session-only.</p>
+    <button className="l1-primary" onClick={onConfirm}>End run & edit</button>
+  </section></div>;
+}
 
 function BackupsDialog({ onClose, conflict, ...props }) {
   const ref = useRef(null);
