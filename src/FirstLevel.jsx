@@ -14,6 +14,7 @@ import SaveBackups from './SaveBackups.jsx';
 import { readStoredProgress, RECOVERY_KEY } from './saveBackups.js';
 import { createSaveSession, SAVE_LOCK } from './saveSession.js';
 import SaveConflict from './SaveConflict.jsx';
+import ComponentContract from './ComponentContract.jsx';
 
 const ICONS = { internet: Activity, api: Server, database: Database, cache: Zap, loadBalancer: GitFork, idGenerator: KeyRound, cdn: Cloud };
 const round = n => Math.round(n || 0).toLocaleString();
@@ -436,6 +437,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
         </> : selectedEdge ? (() => { const edge = design.edges.find(e => e.id === selectedEdge); return edge && <><h2>One call. Two directions.</h2><p>{nameOf(design.nodes.find(n => n.id === edge.from))} calls {nameOf(design.nodes.find(n => n.id === edge.to))}. The result returns on the same connection.</p><div className="l1-callout">→ request<br />← response</div><p className="l1-muted">A reverse wire would mean a different service call, not a reply.</p><button className="l1-danger-button" disabled={sim.running} onClick={() => { change({ ...design, edges: design.edges.filter(e => e.id !== selectedEdge) }); setSelectedEdge(null); }}><Trash2 size={15} /> Disconnect call</button><button className="l1-text-button" onClick={() => setSelectedEdge(null)}>Back to component</button></>; })() : node && CATALOG[node.type] ? (() => {
           const config = CATALOG[node.type], Icon = ICONS[node.type], load = metrics?.loads[node.id];
           return <><div className="l1-inspector-heading"><span className="l1-inspector-icon" style={{ background: config.color }}><Icon size={24} /></span><div><h2>{config.name}</h2><small>{config.verb}</small></div></div><p>{config.role}</p>
+            <ComponentContract design={design} node={node} />
             <button className="l1-guide-button" onClick={() => setGuide(node.type)}><BookOpen size={15} /> How this component works <ChevronRight size={14} /></button>
             <button className="l1-guide-button" disabled={sim.running} onClick={() => { setMoveTarget(node.id); setWire(null); }}><MousePointer2 size={15} /> Move without dragging</button>
             <div className="l1-section-label">CAPACITY <span>GAME UNITS</span></div><div className="l1-tiers">{config.tiers.map((tier, i) => <button disabled={sim.running} key={i} className={node.tier === i ? 'active' : ''} onClick={() => edit({ tier: i })}><strong>{tier.name}</strong><b>${tier.cost}</b><small>{round(tier.capacity)} {node.type === 'database' ? 'reads/s' : 'ops/s'}</small>{tier.writes && <small>{round(tier.writes)} writes/s</small>}</button>)}</div>

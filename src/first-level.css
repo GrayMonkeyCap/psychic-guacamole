@@ -32,6 +32,15 @@
 .l1-backups label { display: grid; gap: 10px; margin: 22px 0; font-size: 14px; }
 .l1-backups input { max-width: 100%; font: inherit; }
 .l1-backup-preview { margin-top: 20px; padding: 14px; border: 1px solid var(--stroke); border-radius: 12px; background: #f0efdb; }
+.l1-component-contract { margin: 16px 0; padding: 12px; border: 1px solid var(--stroke); border-radius: 12px; background: #f5efdb; }
+.l1-component-contract dl { margin: 0; }
+.l1-component-contract dt { font-size: 13px; font-weight: 800; margin-top: 12px; color: #355b50; }
+.l1-component-contract dt:first-child { margin-top: 0; }
+.l1-component-contract dd, .l1-inspector .l1-component-contract p { margin: 5px 0 0; font-size: 14px; line-height: 1.55; color: #435c50; }
+.l1-component-contract summary { cursor: pointer; padding: 12px 0; min-height: 44px; font-size: 14px; font-weight: 700; color: #355b50; }
+.l1-component-contract details { margin-top: 10px; border-top: 1px solid var(--stroke); }
+.l1-component-contract summary:focus-visible { outline: 3px solid #287e9c; outline-offset: 3px; border-radius: 3px; }
+.l1-inspector .l1-component-contract .l1-contract-note { margin-top: 14px; font-size: 12px; }
 .l1-dialog.l1-link-lab-dialog { width: 660px; }
 .l1-link-lab-dialog .l1-link-experiment p { font-size: 16px; color: var(--ink); line-height: 1.5; overflow-wrap: anywhere; }
 .l1-link-experiment label { display: grid; gap: 8px; font-size: 14px; font-weight: 600; }
