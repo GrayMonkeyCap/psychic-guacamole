@@ -1,0 +1,57 @@
+import { createRequire } from 'node:module';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { EMPTY_DESIGN, SAVE_KEY, SAVE_VERSION, CHAPTERS, runChapter } from '../src/levelModel.js';
+const require = createRequire(path.join(process.argv[2], 'package.json'));
+const { chromium } = require('playwright');
+const browser = await chromium.launch({ headless: true, channel: 'msedge' });
+try {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'no-preference' });
+  const page = await context.newPage(), errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('http://127.0.0.1:5173/');
+  const design = { nodes: [...EMPTY_DESIGN.nodes, { id: 'api', type: 'api', tier: 0, strategy: 'sequence', x: 37, y: 43 }, { id: 'db', type: 'database', tier: 0, x: 69, y: 43 }], edges: [{ id: 'a', from: 'internet', to: 'api' }, { id: 'b', from: 'api', to: 'db' }] };
+  await page.evaluate(({ key, save }) => localStorage.setItem(key, JSON.stringify(save)), { key: SAVE_KEY, save: { version: SAVE_VERSION, design, chapter: 0, unlocked: 0, guided: false, certificates: [], history: [] } });
+  await page.goto('http://127.0.0.1:5173/#system-lab');
+  const toggle = page.getByRole('checkbox', { name: 'Animate traffic paths' });
+  const preference = async reduced => {
+    await page.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' });
+    await page.waitForFunction(reduced => document.querySelector('.l1-motion-setting input').disabled === reduced, reduced);
+  };
+  assert.ok(await toggle.isChecked());
+  const pixels = () => page.locator('.l1-wires').evaluate(canvas => canvas.toDataURL());
+  await page.getByRole('button', { name: 'Send traffic', exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.l1-bars i').length >= 3);
+  const moving = await pixels(); await page.waitForTimeout(350);
+  assert.ok((await pixels()) !== moving, 'Traffic particles should move when allowed.');
+  await toggle.uncheck();
+  const frozen = await pixels(), before = await page.locator('.l1-bars i').count();
+  await page.waitForTimeout(650);
+  assert.ok((await pixels()) === frozen, 'Disabling animation should freeze the canvas.');
+  assert.ok(await page.locator('.l1-bars i').count() > before, 'Simulation samples must continue while particles are off.');
+  await preference(true);
+  assert.ok(await toggle.isDisabled()); assert.ok(!(await toggle.isChecked()));
+  await preference(false);
+  assert.ok(!(await toggle.isChecked()), 'Removing OS reduction must preserve the player’s off preference.');
+  await toggle.check();
+  await page.getByRole('button', { name: 'Explain this pass', exact: true }).waitFor({ timeout: 18000 });
+  const expected = runChapter(design, CHAPTERS[0]);
+  const history = await page.evaluate(key => JSON.parse(localStorage.getItem(key)).history.at(-1), SAVE_KEY);
+  assert.equal(history.maxError, expected.maxError);
+  assert.equal(history.estimatedLatencyMs, expected.estimatedLatencyMs);
+  assert.equal(history.passed, expected.passed);
+  // No simulation updates now: the OS subscription must stop an illustrative trace immediately.
+  await page.getByRole('button', { name: 'Follow one request' }).click();
+  await page.getByRole('button', { name: /Read the saved mapping/ }).click();
+  const trace = await pixels(); await page.waitForTimeout(350);
+  assert.ok((await pixels()) !== trace, 'Illustrative trace should animate when allowed.');
+  await preference(true);
+  await page.waitForFunction(() => document.querySelector('.l1-motion-setting input').disabled);
+  const reduced = await pixels(); await page.waitForTimeout(450);
+  assert.ok((await pixels()) === reduced, 'Live reduced-motion changes must freeze traces without another simulation tick.');
+  await preference(false); await toggle.uncheck();
+  await page.reload();
+  assert.ok(!(await toggle.isChecked()), 'The local motion preference should survive reload.');
+  assert.deepEqual(errors, []);
+  console.log('Traffic motion QA passed: moving/frozen canvas pixels, continued samples, identical results, live OS preference during trace, explicit off preference and reload.');
+} finally { await browser.close(); }

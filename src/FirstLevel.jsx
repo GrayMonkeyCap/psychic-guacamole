@@ -19,6 +19,7 @@ import CompletionRecap from './CompletionRecap.jsx';
 import CapacityPicker from './CapacityPicker.jsx';
 import StructureReview, { LocalStructureIssues } from './StructureReview.jsx';
 import SystemNavigator from './SystemNavigator.jsx';
+import { useTrafficMotion } from './motionPreferences.js';
 
 const ICONS = { internet: Activity, api: Server, database: Database, cache: Zap, loadBalancer: GitFork, idGenerator: KeyRound, cdn: Cloud };
 const round = n => Math.round(n || 0).toLocaleString();
@@ -75,7 +76,7 @@ function Guide({ type, onClose }) {
   </section></div>;
 }
 
-function TrafficLines({ design, metrics, running, traceStep, size }) {
+function TrafficLines({ design, metrics, running, traceStep, size, animated }) {
   const ref = useRef(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -84,7 +85,6 @@ function TrafficLines({ design, metrics, running, traceStep, size }) {
     canvas.width = size.width * dpr; canvas.height = size.height * dpr;
     ctx.scale(dpr, dpr);
     let frame;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const draw = time => {
       ctx.clearRect(0, 0, size.width, size.height);
       for (const edge of design.edges) {
@@ -100,7 +100,7 @@ function TrafficLines({ design, metrics, running, traceStep, size }) {
         ctx.strokeStyle = active ? '#db9637' : load ? '#497d77' : '#8cae9f'; ctx.lineWidth = active ? 5 : 3; ctx.stroke();
         const mid = p(.65), before = p(.63), angle = Math.atan2(mid.y - before.y, mid.x - before.x);
         ctx.save(); ctx.translate(mid.x, mid.y); ctx.rotate(angle); ctx.beginPath(); ctx.moveTo(-6, -4); ctx.lineTo(0, 0); ctx.lineTo(-6, 4); ctx.strokeStyle = '#42776d'; ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
-        if ((running && load || active) && !reduced) {
+        if ((running && load || active) && animated) {
           const amount = active ? 2 : Math.min(7, 2 + Math.floor((load.reads + load.writes) / 500));
           for (let i = 0; i < amount; i++) {
             const t = (time / 2200 + i / amount) % 1;
@@ -111,11 +111,11 @@ function TrafficLines({ design, metrics, running, traceStep, size }) {
           if (running && !active) { const dot = p(1 - (time / 2800) % 1); ctx.fillStyle = '#fffbed'; ctx.beginPath(); ctx.arc(dot.x, dot.y, 2.5, 0, Math.PI * 2); ctx.fill(); }
         }
       }
-      if ((running || traceStep) && !reduced) frame = requestAnimationFrame(draw);
+      if ((running || traceStep) && animated) frame = requestAnimationFrame(draw);
     };
     draw(performance.now());
     return () => cancelAnimationFrame(frame);
-  }, [design, metrics, running, traceStep, size]);
+  }, [design, metrics, running, traceStep, size, animated]);
   return <canvas className="l1-wires" ref={ref} aria-hidden="true" />;
 }
 
@@ -127,6 +127,7 @@ function Plot({ frames = [], index, onScrub }) {
 }
 
 export default function FirstLevel({ onExit, onLevelResult, forceTutorial = false }) {
+  const motion = useTrafficMotion();
   const [loaded] = useState(readSave);
   const [saveSession] = useState(() => createSaveSession({ getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value) }, loaded.raw,
     globalThis.navigator?.locks ? action => navigator.locks.request(SAVE_LOCK, action) : null));
@@ -430,6 +431,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
         <div className="l1-rules"><span>Success / sample <b>≥ {100 - CONTRACT_RULES.maxError}%</b></span><span>Est. latency <b>≤ {CONTRACT_RULES.maxLatencyMs} ms</b></span><span>Monthly cost <b>≤ ${LIMIT}</b></span></div>
         <StructureReview design={design} validation={validation} onInspect={inspectIssue} />
         <button className="l1-text-button" onClick={() => setModelGuide(true)}><FlaskConical size={15} /> How tests are measured</button>
+        <div className="l1-motion-setting"><label><input type="checkbox" checked={motion.animated} disabled={motion.reduced} onChange={event => motion.change(event.target.checked)} /> Animate traffic paths</label><p>{motion.reduced ? 'Off: your system requests reduced motion.' : 'Turning animation off keeps simulation and recorded evidence running.'}</p></div>
         <button className="l1-guide-button" disabled={sim.running && !sim.paused} onClick={() => setExperimentOpen(true)}><Link2 size={16} /> Try creating a real mapping <ChevronRight size={14} /></button>
         <button className="l1-text-button" disabled={helpStep === 2} onClick={() => setHelpSteps(steps => ({ ...steps, [help.key]: Math.min(2, helpStep + 1) }))}><BookOpen size={15} />{helpStep < 0 ? 'Give me a nudge' : helpStep === 0 ? 'Show the evidence' : helpStep === 1 ? 'Suggest an experiment' : 'All hints shown'}</button>
         {helpStep >= 0 && <section className="l1-help-ladder" aria-label="Contextual help"><strong>{help.question}</strong>{helpStep >= 1 && <p>{help.evidence}</p>}{helpStep >= 2 && <p>{help.experiment}</p>}{helpStep >= 1 && help.node && <button className="l1-text-button" onClick={() => { setSelected(help.node); setSelectedEdge(null); setTrace(null); setWire(null); if (sim.report) setScrub(sim.report.worstIndex); }}>Inspect the evidence</button>}<button className="l1-text-button" onClick={() => setHelpSteps(steps => ({ ...steps, [help.key]: -1 }))}>Dismiss help</button></section>}
@@ -440,7 +442,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
         <div className="l1-board-toolbar"><span><span className="l1-live-dot" />{sim.running ? sim.paused ? 'TRAFFIC PAUSED' : 'LIVE TRAFFIC' : trace ? 'FOLLOW ONE REQUEST' : sim.report ? 'TEST RECORDING' : 'YOUR ARCHITECTURE'}</span><div><button ref={navigatorTrigger} onClick={() => navigatorOpen ? setNavigatorOpen(false) : openNavigator()} aria-expanded={navigatorOpen} aria-controls="l1-system-navigator">System list</button><button onClick={undo} disabled={!edits.past.length || sim.running} title="Undo · Ctrl Z" aria-label="Undo last edit"><Undo2 size={16} /></button><button onClick={redo} disabled={!edits.future.length || sim.running} title="Redo · Ctrl Shift Z / Ctrl Y" aria-label="Redo last edit"><Redo2 size={16} /></button><button onClick={() => setGuided(g => !g)} className={guided ? 'enabled' : ''} aria-pressed={guided} title="Toggle coach"><BookOpen size={16} /></button></div></div>
         <div className="l1-board-scroll"><div className={`l1-board ${wire ? 'wiring' : ''} ${moveTarget ? 'placing' : ''}`} ref={board} onClick={placeSelected} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const type = e.dataTransfer.getData('text/plain'); if (!CATALOG[type]) return; const rect = board.current.getBoundingClientRect(); add(type, { x: bounded((e.clientX - rect.left - 69) / size.width * 100, 2, Math.min(80, (size.width - 150) / size.width * 100)), y: bounded((e.clientY - rect.top - 56) / size.height * 100, 8, 75) }); }}>
           <span className="l1-board-label">A SMALL SYSTEM. ROOM TO GROW.</span><div className="l1-legend"><span><i className="l1-dot read" />Read</span><span><i className="l1-dot write" />Write</span><span><i className="l1-dot reply" />Reply</span></div>
-          <TrafficLines design={design} metrics={metrics} running={sim.running && !sim.paused} traceStep={traceStep} size={size} />
+          <TrafficLines animated={motion.animated} design={design} metrics={metrics} running={sim.running && !sim.paused} traceStep={traceStep} size={size} />
           {design.edges.map(edge => {
             const from = design.nodes.find(n => n.id === edge.from), to = design.nodes.find(n => n.id === edge.to);
             const edgeMetric = metrics?.edges[`${edge.from}>${edge.to}`];
