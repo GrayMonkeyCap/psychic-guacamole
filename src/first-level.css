@@ -41,6 +41,12 @@
 .l1-component-contract details { margin-top: 10px; border-top: 1px solid var(--stroke); }
 .l1-component-contract summary:focus-visible { outline: 3px solid #287e9c; outline-offset: 3px; border-radius: 3px; }
 .l1-inspector .l1-component-contract .l1-contract-note { margin-top: 14px; font-size: 12px; }
+.l1-completion-recap h3 { font-size: 15px; color: #355b50; margin: 20px 0 8px; }
+.l1-inspector .l1-completion-recap p, .l1-completion-recap li { font-size: 14px; line-height: 1.55; color: #435c50; }
+.l1-completion-recap ul { padding-left: 18px; }
+.l1-completion-recap li { margin-bottom: 12px; }
+.l1-recap-traces { display: grid; gap: 10px; }
+.l1-recap-traces button { min-height: 44px; white-space: normal; }
 .l1-dialog.l1-link-lab-dialog { width: 660px; }
 .l1-link-lab-dialog .l1-link-experiment p { font-size: 16px; color: var(--ink); line-height: 1.5; overflow-wrap: anywhere; }
 .l1-link-experiment label { display: grid; gap: 8px; font-size: 14px; font-weight: 600; }

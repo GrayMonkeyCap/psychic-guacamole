@@ -15,6 +15,7 @@ import { readStoredProgress, RECOVERY_KEY } from './saveBackups.js';
 import { createSaveSession, SAVE_LOCK } from './saveSession.js';
 import SaveConflict from './SaveConflict.jsx';
 import ComponentContract from './ComponentContract.jsx';
+import CompletionRecap from './CompletionRecap.jsx';
 
 const ICONS = { internet: Activity, api: Server, database: Database, cache: Zap, loadBalancer: GitFork, idGenerator: KeyRound, cdn: Cloud };
 const round = n => Math.round(n || 0).toLocaleString();
@@ -153,6 +154,8 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const [sim, setSim] = useState({ running: false, paused: false, frames: [], report: null, suite: false });
   const [scrub, setScrub] = useState(null);
   const [trace, setTrace] = useState(null);
+  const [recapOpen, setRecapOpen] = useState(false);
+  const recapTrigger = useRef(null), traceHeading = useRef(null), focusTrace = useRef(false);
   const [traceKind, setTraceKind] = useState('read');
   const [traceHot, setTraceHot] = useState(false);
   const [helpSteps, setHelpSteps] = useState({});
@@ -232,6 +235,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
     return () => observer.disconnect();
   }, []);
   useEffect(() => { if (notice) { const id = setTimeout(() => setNotice(''), 6000); return () => clearTimeout(id); } }, [notice]);
+  useEffect(() => { if (focusTrace.current && trace) { focusTrace.current = false; traceHeading.current?.focus(); } }, [trace]);
 
   const applyDesign = useCallback(next => {
     if (behaviorChanged(design, next)) {
@@ -309,6 +313,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
 
   function start(suite = false) {
     if (sim.running) return;
+    setRecapOpen(false);
     if (!validation.valid) { setNotice(validation.issues[0].text); setSelected(validation.issues[0].node); return; }
     if (cost > LIMIT) { setNotice(`Your design is $${cost - LIMIT} over budget. Choose smaller tiers or remove unused components.`); return; }
     const id = suite ? 0 : chapterId;
@@ -325,8 +330,10 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
     change({ ...design, nodes: [...design.nodes, { id, type, x: slot.x, y: slot.y, tier: 0, ...(type === 'api' ? { strategy: 'sequence' } : {}) }] }); setSelected(id);
   }
   function edit(patch) { change({ ...design, nodes: design.nodes.map(n => n.id === selected ? { ...n, ...patch } : n) }); }
+  function inspectNode(id) { setRecapOpen(false); setTrace(null); setSelectedEdge(null); setSelected(id); }
   function switchChapter(id) {
     if (sim.running) return;
+    setRecapOpen(false);
     setChapterId(id); setScrub(null); setTrace(null); setMoveTarget(null);
     setSim({ running: false, paused: false, frames: [], report: null, suite: false });
   }
@@ -339,6 +346,15 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
     if (!steps.length) { setNotice('Recorded path unavailable for this sample. Run traffic again.'); return; }
     setTraceKind(outcome.kind); setWire(null); setSelectedEdge(null);
     setTrace({ source: 'recorded', steps, index: 0, time: metrics.time, rate: outcome.rate });
+  }
+  function followRecap({ frameIndex, outcomeIndex }) {
+    const frame = sim.frames[frameIndex], outcome = frame?.outcomes[outcomeIndex];
+    if (!outcome || frame.evidenceVersion !== 1) return;
+    const steps = traceOutcome(design, outcome);
+    if (!steps.length) return;
+    setRecapOpen(false); setScrub(frameIndex); setTraceKind(outcome.kind); setWire(null); setSelectedEdge(null);
+    focusTrace.current = true;
+    setTrace({ source: 'recorded', steps, index: 0, time: frame.time, rate: outcome.rate });
   }
   function beginDrag(e, n) {
     if (sim.running || moveTarget || n.type === 'internet' || e.button !== 0 || e.target.closest('.l1-port')) return;
@@ -393,7 +409,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
         <div className="l1-mission-foot"><FlaskConical size={15} /><span>Same traffic every retry.<br />Make a change. Compare the result.</span></div>
       </aside>
 
-      <section className="l1-workspace">
+      <section className="l1-workspace" onClickCapture={() => setRecapOpen(false)}>
         <div className="l1-board-toolbar"><span><span className="l1-live-dot" />{sim.running ? sim.paused ? 'TRAFFIC PAUSED' : 'LIVE TRAFFIC' : trace ? 'FOLLOW ONE REQUEST' : sim.report ? 'TEST RECORDING' : 'YOUR ARCHITECTURE'}</span><div><button onClick={undo} disabled={!edits.past.length || sim.running} title="Undo · Ctrl Z" aria-label="Undo last edit"><Undo2 size={16} /></button><button onClick={redo} disabled={!edits.future.length || sim.running} title="Redo · Ctrl Shift Z / Ctrl Y" aria-label="Redo last edit"><Redo2 size={16} /></button><button onClick={() => setGuided(g => !g)} className={guided ? 'enabled' : ''} aria-pressed={guided} title="Toggle coach"><BookOpen size={16} /></button></div></div>
         <div className="l1-board-scroll"><div className={`l1-board ${wire ? 'wiring' : ''} ${moveTarget ? 'placing' : ''}`} ref={board} onClick={placeSelected} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const type = e.dataTransfer.getData('text/plain'); if (!CATALOG[type]) return; const rect = board.current.getBoundingClientRect(); add(type, { x: bounded((e.clientX - rect.left - 69) / size.width * 100, 2, Math.min(80, (size.width - 150) / size.width * 100)), y: bounded((e.clientY - rect.top - 56) / size.height * 100, 8, 75) }); }}>
           <span className="l1-board-label">A SMALL SYSTEM. ROOM TO GROW.</span><div className="l1-legend"><span><i className="l1-dot read" />Read</span><span><i className="l1-dot write" />Write</span><span><i className="l1-dot reply" />Reply</span></div>
@@ -409,7 +425,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
             const active = traceStep?.node === n.id, isSelected = selected === n.id;
             const canReceive = wire && !connectionError(design, wire, n.id);
             return <div key={n.id} className={`l1-node ${isSelected ? 'selected' : ''} ${active ? 'trace-active' : ''} ${load?.ratio > 1 ? 'overloaded' : ''} ${wire === n.id ? 'calling' : ''} ${canReceive ? 'can-receive' : ''} shape-${n.type}`} style={{ left: `${n.x}%`, top: `${n.y}%`, '--component': config?.color || '#718e8d' }} onPointerDown={e => beginDrag(e, n)}>
-              <button className="l1-node-face" data-node-id={n.id} onClick={() => { if (suppressClick.current) { suppressClick.current = false; return; } wire ? connect(n.id) : setSelected(n.id); }} onKeyDown={e => { if (sim.running || n.type === 'internet' || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return; e.preventDefault(); change({ ...design, nodes: design.nodes.map(item => item.id === n.id ? { ...item, x: bounded(item.x + (e.key === 'ArrowRight' ? 2 : e.key === 'ArrowLeft' ? -2 : 0), 2, 78), y: bounded(item.y + (e.key === 'ArrowDown' ? 2 : e.key === 'ArrowUp' ? -2 : 0), 8, 75) } : item) }); }} aria-label={`Inspect ${nameOf(n)}`}><span className="l1-node-head"><Icon size={25} strokeWidth={1.7} /><span><strong>{config?.short || 'Visitors'}</strong><small>{n.type === 'api' ? STRATEGIES[n.strategy || 'sequence'].short : config?.tiers[n.tier].name || 'The outside world'}</small></span></span><span className="l1-node-readout"><b>{load ? `${round(load.ratio * 100)}%` : n.type === 'internet' ? metrics ? `${round(metrics.rps)}/s` : '100/s' : 'Ready'}</b><small>{load?.rejected ? `${round(load.rejected)} rejected/s` : load ? `${round(load.rate)} ops/s` : config?.verb || 'shorten + redirect'}</small></span><span className="l1-load-track"><i style={{ width: `${Math.min(100, (load?.ratio || 0) * 100)}%` }} /></span></button>
+              <button className="l1-node-face" data-node-id={n.id} onClick={() => { if (suppressClick.current) { suppressClick.current = false; return; } wire ? connect(n.id) : inspectNode(n.id); }} onKeyDown={e => { if (sim.running || n.type === 'internet' || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return; e.preventDefault(); change({ ...design, nodes: design.nodes.map(item => item.id === n.id ? { ...item, x: bounded(item.x + (e.key === 'ArrowRight' ? 2 : e.key === 'ArrowLeft' ? -2 : 0), 2, 78), y: bounded(item.y + (e.key === 'ArrowDown' ? 2 : e.key === 'ArrowUp' ? -2 : 0), 8, 75) } : item) }); }} aria-label={`Inspect ${nameOf(n)}`}><span className="l1-node-head"><Icon size={25} strokeWidth={1.7} /><span><strong>{config?.short || 'Visitors'}</strong><small>{n.type === 'api' ? STRATEGIES[n.strategy || 'sequence'].short : config?.tiers[n.tier].name || 'The outside world'}</small></span></span><span className="l1-node-readout"><b>{load ? `${round(load.ratio * 100)}%` : n.type === 'internet' ? metrics ? `${round(metrics.rps)}/s` : '100/s' : 'Ready'}</b><small>{load?.rejected ? `${round(load.rejected)} rejected/s` : load ? `${round(load.rate)} ops/s` : config?.verb || 'shorten + redirect'}</small></span><span className="l1-load-track"><i style={{ width: `${Math.min(100, (load?.ratio || 0) * 100)}%` }} /></span></button>
               {n.type !== 'internet' && <button className="l1-port receive" aria-label={`Connect to ${nameOf(n)}`} title={wire && describeConnection(design, wire, n.id).valid ? describeConnection(design, wire, n.id).request : 'Called by another service'} disabled={!wire || sim.running} onClick={() => connect(n.id)} />}
               {['internet', 'api', 'loadBalancer', 'cdn'].includes(n.type) && <button className="l1-port call" aria-label={`Start call from ${nameOf(n)}`} title="Calls another service · replies automatically" disabled={sim.running} onClick={() => { setMoveTarget(null); setWire(w => w === n.id ? null : n.id); setSelected(n.id); setTrace(null); }}><Plus size={10} /></button>}
             </div>;
@@ -428,9 +444,9 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
       </section>
 
       <aside className="l1-inspector l1-paper">
-        <div className="l1-eyebrow">{trace ? 'REQUEST INSPECTOR' : selectedEdge ? 'CONNECTION INSPECTOR' : 'COMPONENT INSPECTOR'}</div>
-        {wire ? <ConnectionPlanner key={wire} design={design} from={wire} onConnect={connect} onCancel={() => setWire(null)} /> : trace ? <>
-          <div className="l1-inspector-heading"><h2>{trace.source === 'recorded' ? traceKind === 'read' ? 'Recorded redirects' : 'Recorded creations' : traceKind === 'read' ? 'Follow a redirect' : 'Create a link'}</h2><button className="l1-text-button" onClick={() => setTrace(null)} aria-label="Close request trace"><X size={18} /></button></div>
+        <div className="l1-eyebrow">{recapOpen && sim.report?.passed ? 'YOUR DESIGN CHOICES' : trace ? 'REQUEST INSPECTOR' : selectedEdge ? 'CONNECTION INSPECTOR' : 'COMPONENT INSPECTOR'}</div>
+        {wire ? <ConnectionPlanner key={wire} design={design} from={wire} onConnect={connect} onCancel={() => setWire(null)} /> : recapOpen && sim.report?.passed ? <CompletionRecap design={design} chapter={chapter} result={sim.report} onFollow={followRecap} onClose={() => { setRecapOpen(false); recapTrigger.current?.focus(); }} /> : trace ? <>
+          <div className="l1-inspector-heading"><h2 ref={traceHeading} tabIndex={-1}>{trace.source === 'recorded' ? traceKind === 'read' ? 'Recorded redirects' : 'Recorded creations' : traceKind === 'read' ? 'Follow a redirect' : 'Create a link'}</h2><button className="l1-text-button" onClick={() => setTrace(null)} aria-label="Close request trace"><X size={18} /></button></div>
           <p className="l1-muted">{trace.source === 'recorded' ? `${trace.time.toFixed(1)}s sample · ≈ ${trace.rate.toLocaleString(undefined, { maximumFractionDigits: 1 })} requests/sec. Calls and outcomes come from this run; reply steps explain the synchronous return path. This is a request group, not an individual capture.` : 'One illustrative request through your architecture, not evidence from a traffic run. Click any step to follow the conversation.'}</p>
           <ol className="l1-trace-steps">{trace.steps.map((step, i) => <li key={i}><button className={i === trace.index ? 'active' : ''} onClick={() => setTrace(t => ({ ...t, index: i }))}><b>{i < trace.index ? <Check size={12} /> : i + 1}</b><span>{step.title}<small>{componentLabel(design, step.node)}</small></span></button></li>)}</ol>
           <div className="l1-trace-detail"><strong>{traceStep.title}</strong><p>{traceStep.detail}</p></div>
@@ -458,7 +474,15 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
       </aside>
     </main>
 
-    {sim.report && <section className={`l1-postmortem ${sim.report.passed ? 'passed' : 'failed'}`} aria-label="Traffic test results"><div className="l1-result-title"><span>{sim.report.passed ? <Check size={23} /> : <Activity size={23} />}</span><div><small>{sim.report.passed ? 'CHALLENGE PASSED' : 'A USEFUL FAILURE'}</small><strong>{sim.report.passed ? certified ? 'Every challenge, one design.' : 'Your link held up.' : 'Now you know where it hurts.'}</strong></div></div><div className="l1-result-explanation"><p>{sim.report.reason}</p><small>Worst success: {(100 - sim.report.maxError).toFixed(1)}% · Highest estimated latency: {latencyLabel(sim.report.estimatedLatencyMs)} · ${sim.report.cost}/mo</small>{!sim.report.passed && <button className="l1-text-button" onClick={() => { setSelected(sim.report.bottleneck); setSelectedEdge(null); setTrace(null); }}>{sim.report.alternatives}</button>}{previousResult && <small>Previous attempt: ${previousResult.cost} · {latencyLabel(previousResult.estimatedLatencyMs)}. This attempt: ${sim.report.cost} · {sim.report.estimatedLatencyMs} ms.</small>}</div><div className="l1-result-actions">{!sim.report.passed ? <button className="l1-primary" onClick={() => { setSelected(sim.report.bottleneck); setSelectedEdge(null); setTrace(null); setScrub(sim.report.worstIndex); }}>Inspect bottleneck <Gauge size={17} /></button> : chapterId < 2 ? <button className="l1-primary" onClick={() => switchChapter(chapterId + 1)}>Next challenge <ArrowRight size={17} /></button> : <button className="l1-primary" onClick={() => start(true)}>{certified ? 'Replay the full contract' : 'Test all three'}<Play size={16} /></button>}<small>{certified ? `★ Solved ${cost <= EFFICIENCY_TARGET ? '★ Efficient' : `· Try under $${EFFICIENCY_TARGET}`} · Keep experimenting` : 'Edits keep challenges unlocked; retest to certify your new design.'}</small></div></section>}
+    {sim.report && <section className={`l1-postmortem ${sim.report.passed ? 'passed' : 'failed'}`} aria-label="Traffic test results">
+      <div className="l1-result-title"><span>{sim.report.passed ? <Check size={23} /> : <Activity size={23} />}</span><div><small>{sim.report.passed ? 'CHALLENGE PASSED' : 'A USEFUL FAILURE'}</small><strong>{sim.report.passed ? certified ? 'Every challenge, one design.' : 'Your link held up.' : 'Now you know where it hurts.'}</strong></div></div>
+      <div className="l1-result-explanation"><p>{sim.report.reason}</p><small>Worst success: {(100 - sim.report.maxError).toFixed(1)}% · Highest estimated latency: {latencyLabel(sim.report.estimatedLatencyMs)} · ${sim.report.cost}/mo</small>
+        {!sim.report.passed && <button className="l1-text-button" onClick={() => { setSelected(sim.report.bottleneck); setSelectedEdge(null); setTrace(null); }}>{sim.report.alternatives}</button>}
+        {sim.report.passed && <button ref={recapTrigger} className="l1-text-button" onClick={() => { setWire(null); setTrace(null); setSelectedEdge(null); setRecapOpen(true); }}>Explain this pass <BookOpen size={16} /></button>}
+        {previousResult && <small>Previous attempt: ${previousResult.cost} · {latencyLabel(previousResult.estimatedLatencyMs)}. This attempt: ${sim.report.cost} · {latencyLabel(sim.report.estimatedLatencyMs)}.</small>}
+      </div>
+      <div className="l1-result-actions">{!sim.report.passed ? <button className="l1-primary" onClick={() => { setSelected(sim.report.bottleneck); setSelectedEdge(null); setTrace(null); setScrub(sim.report.worstIndex); }}>Inspect bottleneck <Gauge size={17} /></button> : chapterId < 2 ? <button className="l1-primary" onClick={() => switchChapter(chapterId + 1)}>Next challenge <ArrowRight size={17} /></button> : <button className="l1-primary" onClick={() => start(true)}>{certified ? 'Replay the full contract' : 'Test all three'}<Play size={16} /></button>}<small>{certified ? `★ Solved ${cost <= EFFICIENCY_TARGET ? '★ Efficient' : `· Try under $${EFFICIENCY_TARGET}`} · Keep experimenting` : 'Edits keep challenges unlocked; retest to certify your new design.'}</small></div>
+    </section>}
 
     <footer className="l1-controls">
       <div className="l1-system-state"><span className={`l1-status-orb ${metrics && (metrics.errorRate > CONTRACT_RULES.maxError || metrics.estimatedLatencyMs > CONTRACT_RULES.maxLatencyMs) ? 'danger' : sim.running ? 'live' : ''}`} /><div><small>{sim.running ? sim.suite ? 'FULL CONTRACT TEST' : 'TRAFFIC TEST' : sim.report ? 'REPLAY & INSPECT' : 'BUILD MODE'}</small><strong>{sim.running ? sim.paused ? 'Paused. Take a look.' : `${chapter.name} · ${(metrics?.time || 0).toFixed(0)} / ${chapter.duration}s` : sim.report ? 'Drag the timeline to inspect' : validation.valid ? 'Ready for visitors' : 'Connect your first system'}</strong></div></div>
