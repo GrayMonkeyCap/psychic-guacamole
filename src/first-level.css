@@ -66,6 +66,12 @@
 .l1-local-issues { margin: 12px 0; padding: 12px; border: 1px solid #cbb489; border-radius: 10px; background: #fff1d8; }
 .l1-local-issues h3 { margin: 0 0 8px; font-size: 14px; color: #754321; }
 .l1-inspector .l1-local-issues p { font-size: 13px; line-height: 1.5; color: #754321; }
+.l1-inspector .l1-system-navigator p { font-size: 13px; line-height: 1.5; color: #435c50; }
+.l1-system-navigator h3 { font-size: 15px; color: #355b50; margin-top: 22px; }
+.l1-system-navigator ul { list-style: none; padding: 0; display: grid; gap: 10px; }
+.l1-system-navigator li { padding: 12px; border: 1px solid var(--stroke); border-radius: 12px; background: #f5efdb; }
+.l1-system-navigator li > div { display: grid; gap: 8px; }
+.l1-system-navigator li button { width: 100%; min-height: 44px; padding: 9px; border: 1px solid #9fac91; border-radius: 8px; background: #e8edd5; font: inherit; font-size: 13px; color: #355b50; text-align: left; }
 .l1-dialog.l1-link-lab-dialog { width: 660px; }
 .l1-link-lab-dialog .l1-link-experiment p { font-size: 16px; color: var(--ink); line-height: 1.5; overflow-wrap: anywhere; }
 .l1-link-experiment label { display: grid; gap: 8px; font-size: 14px; font-weight: 600; }

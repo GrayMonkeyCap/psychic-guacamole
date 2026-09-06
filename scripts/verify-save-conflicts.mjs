@@ -23,7 +23,7 @@ try {
   await saved(a); await conflict(b);
   await b.getByRole('button', { name: 'Add API server', exact: true }).click();
   await conflict(b);
-  assert.equal(await b.getByRole('button', { name: 'Inspect API server', exact: true }).count(), 2);
+  assert.equal(await b.getByRole('button', { name: /^Inspect API server [12]$/ }).count(), 2);
   assert.equal(await b.evaluate(key => JSON.parse(localStorage.getItem(key)).design.nodes.filter(n => n.type === 'api').length, key), 1);
   await open(b);
   await b.getByRole('button', { name: 'Replace browser save with this board', exact: true }).click();
@@ -33,11 +33,11 @@ try {
   await open(a);
   await a.getByRole('button', { name: 'Replace this board with saved copy', exact: true }).click();
   await saved(a); await close(a);
-  assert.equal(await a.getByRole('button', { name: 'Inspect API server', exact: true }).count(), 2);
+  assert.equal(await a.getByRole('button', { name: /^Inspect API server [12]$/ }).count(), 2);
   assert.equal(await a.getByRole('button', { name: 'Inspect Database', exact: true }).count(), 0);
   assert.equal(await a.evaluate(key => JSON.parse(localStorage.getItem(key)).design.nodes.some(n => n.type === 'database'), recovery), true);
   await a.reload(); await saved(a);
-  assert.equal(await a.getByRole('button', { name: 'Inspect API server', exact: true }).count(), 2);
+  assert.equal(await a.getByRole('button', { name: /^Inspect API server [12]$/ }).count(), 2);
   // A future format must survive mounting this older build verbatim.
   const future = JSON.stringify({ version: 999, futureBoard: 'preserve me' });
   await b.close();
