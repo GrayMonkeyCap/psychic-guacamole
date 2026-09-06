@@ -17,6 +17,7 @@ import SaveConflict from './SaveConflict.jsx';
 import ComponentContract from './ComponentContract.jsx';
 import CompletionRecap from './CompletionRecap.jsx';
 import CapacityPicker from './CapacityPicker.jsx';
+import StructureReview, { LocalStructureIssues } from './StructureReview.jsx';
 
 const ICONS = { internet: Activity, api: Server, database: Database, cache: Zap, loadBalancer: GitFork, idGenerator: KeyRound, cdn: Cloud };
 const round = n => Math.round(n || 0).toLocaleString();
@@ -157,6 +158,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const [trace, setTrace] = useState(null);
   const [recapOpen, setRecapOpen] = useState(false);
   const recapTrigger = useRef(null), traceHeading = useRef(null), focusTrace = useRef(false);
+  const inspector = useRef(null);
   const [traceKind, setTraceKind] = useState('read');
   const [traceHot, setTraceHot] = useState(false);
   const [helpSteps, setHelpSteps] = useState({});
@@ -332,6 +334,13 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   }
   function edit(patch) { change({ ...design, nodes: design.nodes.map(n => n.id === selected ? { ...n, ...patch } : n) }); }
   function inspectNode(id) { setRecapOpen(false); setTrace(null); setSelectedEdge(null); setSelected(id); }
+  function inspectIssue(id) {
+    inspectNode(id); setWire(null); setMoveTarget(null);
+    requestAnimationFrame(() => {
+      inspector.current?.scrollTo({ top: 0 });
+      [...(board.current?.querySelectorAll('[data-node-id]') || [])].find(element => element.dataset.nodeId === id)?.focus();
+    });
+  }
   function switchChapter(id) {
     if (sim.running) return;
     setRecapOpen(false);
@@ -403,6 +412,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
         <div className="l1-contract"><small>YOUR SYSTEM MUST</small>{['Answer the request', 'Remember the mapping', 'Create a unique code'].map((label, i) => <div key={label} className={validation.capabilities[i] ? 'complete' : ''}><span>{validation.capabilities[i] ? <Check size={12} /> : i + 1}</span>{label}</div>)}</div>
         <div className="l1-forecast"><small>TRAFFIC FORECAST</small><div><strong>{round(chapter.peak)}</strong><span>requests / sec</span></div><div className="l1-mix"><i style={{ width: `${chapter.reads * 100}%` }} /></div><span><i className="l1-dot read" />{Math.round(chapter.reads * 100)}% redirects <i className="l1-dot write" />{Math.round((1 - chapter.reads) * 100)}% creations</span>{chapterId === 1 && <b>92% of reads visit one hot link.</b>}</div>
         <div className="l1-rules"><span>Success / sample <b>≥ {100 - CONTRACT_RULES.maxError}%</b></span><span>Est. latency <b>≤ {CONTRACT_RULES.maxLatencyMs} ms</b></span><span>Monthly cost <b>≤ ${LIMIT}</b></span></div>
+        <StructureReview design={design} validation={validation} onInspect={inspectIssue} />
         <button className="l1-text-button" onClick={() => setModelGuide(true)}><FlaskConical size={15} /> How tests are measured</button>
         <button className="l1-guide-button" disabled={sim.running && !sim.paused} onClick={() => setExperimentOpen(true)}><Link2 size={16} /> Try creating a real mapping <ChevronRight size={14} /></button>
         <button className="l1-text-button" disabled={helpStep === 2} onClick={() => setHelpSteps(steps => ({ ...steps, [help.key]: Math.min(2, helpStep + 1) }))}><BookOpen size={15} />{helpStep < 0 ? 'Give me a nudge' : helpStep === 0 ? 'Show the evidence' : helpStep === 1 ? 'Suggest an experiment' : 'All hints shown'}</button>
@@ -444,8 +454,9 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
         })}</div></div>
       </section>
 
-      <aside className="l1-inspector l1-paper">
+      <aside className="l1-inspector l1-paper" ref={inspector}>
         <div className="l1-eyebrow">{recapOpen && sim.report?.passed ? 'YOUR DESIGN CHOICES' : trace ? 'REQUEST INSPECTOR' : selectedEdge ? 'CONNECTION INSPECTOR' : 'COMPONENT INSPECTOR'}</div>
+        {!wire && !trace && !selectedEdge && !(recapOpen && sim.report?.passed) && <LocalStructureIssues selected={selected} validation={validation} />}
         {wire ? <ConnectionPlanner key={wire} design={design} from={wire} onConnect={connect} onCancel={() => setWire(null)} /> : recapOpen && sim.report?.passed ? <CompletionRecap design={design} chapter={chapter} result={sim.report} onFollow={followRecap} onClose={() => { setRecapOpen(false); recapTrigger.current?.focus(); }} /> : trace ? <>
           <div className="l1-inspector-heading"><h2 ref={traceHeading} tabIndex={-1}>{trace.source === 'recorded' ? traceKind === 'read' ? 'Recorded redirects' : 'Recorded creations' : traceKind === 'read' ? 'Follow a redirect' : 'Create a link'}</h2><button className="l1-text-button" onClick={() => setTrace(null)} aria-label="Close request trace"><X size={18} /></button></div>
           <p className="l1-muted">{trace.source === 'recorded' ? `${trace.time.toFixed(1)}s sample · ≈ ${trace.rate.toLocaleString(undefined, { maximumFractionDigits: 1 })} requests/sec. Calls and outcomes come from this run; reply steps explain the synchronous return path. This is a request group, not an individual capture.` : 'One illustrative request through your architecture, not evidence from a traffic run. Click any step to follow the conversation.'}</p>
