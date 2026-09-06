@@ -1,0 +1,794 @@
+{
+  "modelVersion": "admission-v2",
+  "scenarios": [
+    "[0,100,0.8,0.15,12,{\"maxError\":2,\"maxLatencyMs\":300,\"budget\":900}]",
+    "[1,2400,0.98,0.92,16,{\"maxError\":2,\"maxLatencyMs\":300,\"budget\":900}]",
+    "[2,1400,0.15,0.2,16,{\"maxError\":2,\"maxLatencyMs\":300,\"budget\":900}]"
+  ],
+  "budget": 900,
+  "enumerated": 2610,
+  "excludedOverBudget": 1980,
+  "tested": 630,
+  "passing": 144,
+  "families": [
+    {
+      "family": "Direct origin",
+      "tested": 43,
+      "passing": 12,
+      "cheapest": {
+        "family": "Direct origin",
+        "options": {
+          "api": [
+            1
+          ],
+          "db": 1,
+          "cache": null,
+          "cdn": null,
+          "balancer": null,
+          "strategy": "random",
+          "allocator": null
+        },
+        "cost": 445,
+        "results": [
+          {
+            "chapter": 0,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 35
+          },
+          {
+            "chapter": 1,
+            "passed": true,
+            "maxError": 1.1888952127995966,
+            "estimatedLatencyMs": 43
+          },
+          {
+            "chapter": 2,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 41
+          }
+        ],
+        "passed": true
+      }
+    },
+    {
+      "family": "Origin cache",
+      "tested": 102,
+      "passing": 25,
+      "cheapest": {
+        "family": "Origin cache",
+        "options": {
+          "api": [
+            1
+          ],
+          "db": 1,
+          "cache": 0,
+          "cdn": null,
+          "balancer": null,
+          "strategy": "random",
+          "allocator": null
+        },
+        "cost": 540,
+        "results": [
+          {
+            "chapter": 0,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 38
+          },
+          {
+            "chapter": 1,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 45
+          },
+          {
+            "chapter": 2,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 44
+          }
+        ],
+        "passed": true
+      }
+    },
+    {
+      "family": "Edge cache",
+      "tested": 73,
+      "passing": 14,
+      "cheapest": {
+        "family": "Edge cache",
+        "options": {
+          "api": [
+            1
+          ],
+          "db": 1,
+          "cache": null,
+          "cdn": 0,
+          "balancer": null,
+          "strategy": "random",
+          "allocator": null
+        },
+        "cost": 595,
+        "results": [
+          {
+            "chapter": 0,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 38
+          },
+          {
+            "chapter": 1,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 42
+          },
+          {
+            "chapter": 2,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 46
+          }
+        ],
+        "passed": true
+      }
+    },
+    {
+      "family": "Edge + origin cache",
+      "tested": 111,
+      "passing": 17,
+      "cheapest": {
+        "family": "Edge + origin cache",
+        "options": {
+          "api": [
+            1
+          ],
+          "db": 1,
+          "cache": 0,
+          "cdn": 0,
+          "balancer": null,
+          "strategy": "random",
+          "allocator": null
+        },
+        "cost": 690,
+        "results": [
+          {
+            "chapter": 0,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 41
+          },
+          {
+            "chapter": 1,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 44
+          },
+          {
+            "chapter": 2,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 49
+          }
+        ],
+        "passed": true
+      }
+    },
+    {
+      "family": "Balanced APIs",
+      "tested": 107,
+      "passing": 28,
+      "cheapest": {
+        "family": "Balanced APIs",
+        "options": {
+          "api": [
+            0,
+            0
+          ],
+          "db": 1,
+          "cache": null,
+          "cdn": null,
+          "balancer": 0,
+          "strategy": "random",
+          "allocator": null
+        },
+        "cost": 560,
+        "results": [
+          {
+            "chapter": 0,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 38
+          },
+          {
+            "chapter": 1,
+            "passed": true,
+            "maxError": 1.1888952127995966,
+            "estimatedLatencyMs": 49
+          },
+          {
+            "chapter": 2,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 46
+          }
+        ],
+        "passed": true
+      }
+    },
+    {
+      "family": "Balanced + shared cache",
+      "tested": 127,
+      "passing": 33,
+      "cheapest": {
+        "family": "Balanced + shared cache",
+        "options": {
+          "api": [
+            0,
+            0
+          ],
+          "db": 1,
+          "cache": 0,
+          "cdn": null,
+          "balancer": 0,
+          "strategy": "random",
+          "allocator": null
+        },
+        "cost": 655,
+        "results": [
+          {
+            "chapter": 0,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 42
+          },
+          {
+            "chapter": 1,
+            "passed": true,
+            "maxError": 0.4777070063694152,
+            "estimatedLatencyMs": 51
+          },
+          {
+            "chapter": 2,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 49
+          }
+        ],
+        "passed": true
+      }
+    },
+    {
+      "family": "Balanced + edge",
+      "tested": 67,
+      "passing": 15,
+      "cheapest": {
+        "family": "Balanced + edge",
+        "options": {
+          "api": [
+            0,
+            0
+          ],
+          "db": 1,
+          "cache": null,
+          "cdn": 0,
+          "balancer": 0,
+          "strategy": "random",
+          "allocator": null
+        },
+        "cost": 710,
+        "results": [
+          {
+            "chapter": 0,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 42
+          },
+          {
+            "chapter": 1,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 45
+          },
+          {
+            "chapter": 2,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 50
+          }
+        ],
+        "passed": true
+      }
+    }
+  ],
+  "strategies": [
+    {
+      "strategy": "sequence",
+      "tested": 165,
+      "passing": 45,
+      "cheapest": {
+        "family": "Origin cache",
+        "options": {
+          "api": [
+            1
+          ],
+          "db": 1,
+          "cache": 0,
+          "cdn": null,
+          "balancer": null,
+          "strategy": "sequence",
+          "allocator": null
+        },
+        "cost": 540,
+        "results": [
+          {
+            "chapter": 0,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 38
+          },
+          {
+            "chapter": 1,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 45
+          },
+          {
+            "chapter": 2,
+            "passed": true,
+            "maxError": 1.2429146339563866,
+            "estimatedLatencyMs": 45
+          }
+        ],
+        "passed": true
+      },
+      "frontier": 2
+    },
+    {
+      "strategy": "random",
+      "tested": 165,
+      "passing": 58,
+      "cheapest": {
+        "family": "Direct origin",
+        "options": {
+          "api": [
+            1
+          ],
+          "db": 1,
+          "cache": null,
+          "cdn": null,
+          "balancer": null,
+          "strategy": "random",
+          "allocator": null
+        },
+        "cost": 445,
+        "results": [
+          {
+            "chapter": 0,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 35
+          },
+          {
+            "chapter": 1,
+            "passed": true,
+            "maxError": 1.1888952127995966,
+            "estimatedLatencyMs": 43
+          },
+          {
+            "chapter": 2,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 41
+          }
+        ],
+        "passed": true
+      },
+      "frontier": 7
+    },
+    {
+      "strategy": "service",
+      "tested": 300,
+      "passing": 41,
+      "cheapest": {
+        "family": "Direct origin",
+        "options": {
+          "api": [
+            1
+          ],
+          "db": 1,
+          "cache": null,
+          "cdn": null,
+          "balancer": null,
+          "strategy": "service",
+          "allocator": 1
+        },
+        "cost": 550,
+        "results": [
+          {
+            "chapter": 0,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 38
+          },
+          {
+            "chapter": 1,
+            "passed": true,
+            "maxError": 1.1857707509881383,
+            "estimatedLatencyMs": 46
+          },
+          {
+            "chapter": 2,
+            "passed": true,
+            "maxError": 0,
+            "estimatedLatencyMs": 46
+          }
+        ],
+        "passed": true
+      },
+      "frontier": 0
+    }
+  ],
+  "serviceOnlyHardware": 0,
+  "frontierCount": 9,
+  "frontierMetricPoints": 7,
+  "frontier": [
+    {
+      "family": "Direct origin",
+      "options": {
+        "api": [
+          1
+        ],
+        "db": 1,
+        "cache": null,
+        "cdn": null,
+        "balancer": null,
+        "strategy": "random",
+        "allocator": null
+      },
+      "cost": 445,
+      "results": [
+        {
+          "chapter": 0,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 35
+        },
+        {
+          "chapter": 1,
+          "passed": true,
+          "maxError": 1.1888952127995966,
+          "estimatedLatencyMs": 43
+        },
+        {
+          "chapter": 2,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 41
+        }
+      ],
+      "passed": true
+    },
+    {
+      "family": "Origin cache",
+      "options": {
+        "api": [
+          1
+        ],
+        "db": 1,
+        "cache": 0,
+        "cdn": null,
+        "balancer": null,
+        "strategy": "random",
+        "allocator": null
+      },
+      "cost": 540,
+      "results": [
+        {
+          "chapter": 0,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 38
+        },
+        {
+          "chapter": 1,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 45
+        },
+        {
+          "chapter": 2,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 44
+        }
+      ],
+      "passed": true
+    },
+    {
+      "family": "Edge cache",
+      "options": {
+        "api": [
+          1
+        ],
+        "db": 1,
+        "cache": null,
+        "cdn": 0,
+        "balancer": null,
+        "strategy": "random",
+        "allocator": null
+      },
+      "cost": 595,
+      "results": [
+        {
+          "chapter": 0,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 38
+        },
+        {
+          "chapter": 1,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 42
+        },
+        {
+          "chapter": 2,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 46
+        }
+      ],
+      "passed": true
+    },
+    {
+      "family": "Direct origin",
+      "options": {
+        "api": [
+          2
+        ],
+        "db": 1,
+        "cache": null,
+        "cdn": null,
+        "balancer": null,
+        "strategy": "random",
+        "allocator": null
+      },
+      "cost": 600,
+      "results": [
+        {
+          "chapter": 0,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 35
+        },
+        {
+          "chapter": 1,
+          "passed": true,
+          "maxError": 1.1888952127995966,
+          "estimatedLatencyMs": 41
+        },
+        {
+          "chapter": 2,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 40
+        }
+      ],
+      "passed": true
+    },
+    {
+      "family": "Origin cache",
+      "options": {
+        "api": [
+          1
+        ],
+        "db": 1,
+        "cache": 1,
+        "cdn": null,
+        "balancer": null,
+        "strategy": "random",
+        "allocator": null
+      },
+      "cost": 615,
+      "results": [
+        {
+          "chapter": 0,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 38
+        },
+        {
+          "chapter": 1,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 44
+        },
+        {
+          "chapter": 2,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 44
+        }
+      ],
+      "passed": true
+    },
+    {
+      "family": "Direct origin",
+      "options": {
+        "api": [
+          1
+        ],
+        "db": 2,
+        "cache": null,
+        "cdn": null,
+        "balancer": null,
+        "strategy": "random",
+        "allocator": null
+      },
+      "cost": 655,
+      "results": [
+        {
+          "chapter": 0,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 35
+        },
+        {
+          "chapter": 1,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 40
+        },
+        {
+          "chapter": 2,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 39
+        }
+      ],
+      "passed": true
+    },
+    {
+      "family": "Direct origin",
+      "options": {
+        "api": [
+          1
+        ],
+        "db": 2,
+        "cache": null,
+        "cdn": null,
+        "balancer": null,
+        "strategy": "sequence",
+        "allocator": null
+      },
+      "cost": 655,
+      "results": [
+        {
+          "chapter": 0,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 35
+        },
+        {
+          "chapter": 1,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 40
+        },
+        {
+          "chapter": 2,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 39
+        }
+      ],
+      "passed": true
+    },
+    {
+      "family": "Direct origin",
+      "options": {
+        "api": [
+          2
+        ],
+        "db": 2,
+        "cache": null,
+        "cdn": null,
+        "balancer": null,
+        "strategy": "random",
+        "allocator": null
+      },
+      "cost": 810,
+      "results": [
+        {
+          "chapter": 0,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 35
+        },
+        {
+          "chapter": 1,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 38
+        },
+        {
+          "chapter": 2,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 38
+        }
+      ],
+      "passed": true
+    },
+    {
+      "family": "Direct origin",
+      "options": {
+        "api": [
+          2
+        ],
+        "db": 2,
+        "cache": null,
+        "cdn": null,
+        "balancer": null,
+        "strategy": "sequence",
+        "allocator": null
+      },
+      "cost": 810,
+      "results": [
+        {
+          "chapter": 0,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 35
+        },
+        {
+          "chapter": 1,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 38
+        },
+        {
+          "chapter": 2,
+          "passed": true,
+          "maxError": 0,
+          "estimatedLatencyMs": 38
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "componentTiers": {
+    "api": [
+      "Small",
+      "Medium",
+      "Large"
+    ],
+    "database": [
+      "Small",
+      "Medium",
+      "Large"
+    ],
+    "cache": [
+      "Small",
+      "Medium",
+      "Large"
+    ],
+    "loadBalancer": [
+      "Small",
+      "Medium",
+      "Large"
+    ],
+    "idGenerator": [
+      "Small",
+      "Medium",
+      "Large"
+    ],
+    "cdn": [
+      "Small",
+      "Medium",
+      "Large"
+    ]
+  }
+}

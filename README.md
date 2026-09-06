@@ -20,6 +20,8 @@ npm test
 npm run build
 ```
 
+`node scripts/balance-audit.mjs` reproduces the [representative design-balance audit](docs/level-1-balance-audit.md): seven topology families, all supported tiers/strategies, exact versioned outcomes and a finite cost/error/latency frontier. It prints JSON only; model regression tests check the published snapshot. This is simulator evidence, not production sizing or proof of learning.
+
 The canonical implementation is `src/FirstLevel.jsx` with pure simulation and validation in `src/levelModel.js`. `src/levelModel.test.js` checks functionality, graph routing, caches, overload/recovery, multiple winning designs, and persistence validation.
 
 `scripts/verify-level.mjs` runs an isolated browser playthrough using an existing Playwright installation and Microsoft Edge:
