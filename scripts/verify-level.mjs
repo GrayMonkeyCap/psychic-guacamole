@@ -1,3 +1,4 @@
+import { TEST_URL } from './verification-config.mjs';
 // Usage: node scripts/verify-level.mjs <directory containing playwright>
 // Browser checks use an isolated context and never touch the player's saved board.
 import { createRequire } from 'node:module';
@@ -14,7 +15,7 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 1000
 const page = await context.newPage();
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
-await page.goto('http://127.0.0.1:5173/#system-lab');
+await page.goto(`${TEST_URL}/#system-lab`);
 await page.getByRole('button', { name: 'Let’s build a link' }).click();
 await page.screenshot({ path: path.join(artifactDir, 'first-level-empty.png'), fullPage: true });
 await page.getByRole('button', { name: 'Add API server', exact: true }).click();

@@ -1,3 +1,4 @@
+import { TEST_URL } from './verification-config.mjs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -10,7 +11,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce', acceptDownloads: true });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://127.0.0.1:5173/#system-lab');
+  await page.goto(`${TEST_URL}/#system-lab`);
   await page.getByRole('button', { name: 'Let’s build a link' }).click();
   await page.getByRole('button', { name: 'Add API server', exact: true }).click();
   const open = () => page.getByRole('button', { name: 'Save backups & restore' }).click();
@@ -46,9 +47,9 @@ try {
   await page.reload();
   assert.ok(await page.getByRole('button', { name: 'Inspect Database', exact: true }).isVisible());
   await page.evaluate(key => localStorage.setItem(key, '{corrupt'), key);
-  await page.goto('http://127.0.0.1:5173/');
+  await page.goto(`${TEST_URL}/`);
   await page.getByRole('status').filter({ hasText: 'recovery copy' }).waitFor();
-  await page.goto('http://127.0.0.1:5173/#system-lab');
+  await page.goto(`${TEST_URL}/#system-lab`);
   assert.ok(await page.getByRole('button', { name: 'Inspect API server', exact: true }).isVisible());
   assert.equal(await page.getByRole('button', { name: 'Inspect Database', exact: true }).count(), 0);
   assert.deepEqual(errors, []);

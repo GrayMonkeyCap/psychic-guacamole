@@ -20,6 +20,16 @@ npm test
 npm run build
 ```
 
+For a complete production-build check in one command (installed Playwright + Microsoft Edge required):
+
+```bash
+npm run verify -- --runtime /path/to/node_modules
+```
+
+Omit `--runtime` if Playwright is installed in this repository, or set `PLAYWRIGHT_NODE_MODULES`. The runner checks dependencies, runs unit/component tests, builds production assets and exercises all 17 browser scripts against its own localhost preview on port 5181. It stops on the first failure and exits nonzero; it never downloads dependencies or stops an existing server. Use `--port 5182` if occupied. Its preview is closed on success, failure or interruption; the player's running development preview and browser profile are not used. Screenshots go to a unique ignored `.test-artifacts/verify-*` directory.
+
+`--suite smoke` explicitly selects six browser checks (campaign, connections, backups, concurrent saves, text navigator and playback), plus all unit tests/build; it is not the full release check. `--help` lists options. Allow several minutes for the full suite. Automated checks do not establish accessibility conformance or learning outcomes.
+
 `node scripts/balance-audit.mjs` reproduces the [representative design-balance audit](docs/level-1-balance-audit.md): seven topology families, all supported tiers/strategies, exact versioned outcomes and a finite cost/error/latency frontier. It prints JSON only; model regression tests check the published snapshot. This is simulator evidence, not production sizing or proof of learning.
 
 The canonical implementation is `src/FirstLevel.jsx` with pure simulation and validation in `src/levelModel.js`. `src/levelModel.test.js` checks functionality, graph routing, caches, overload/recovery, multiple winning designs, and persistence validation.

@@ -1,3 +1,4 @@
+import { TEST_URL } from './verification-config.mjs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -9,10 +10,10 @@ try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://127.0.0.1:5173/');
+  await page.goto(`${TEST_URL}/`);
   const design = { nodes: [...EMPTY_DESIGN.nodes, { id: 'api', type: 'api', tier: 0, strategy: 'sequence', x: 37, y: 43 }, { id: 'db', type: 'database', tier: 0, x: 69, y: 43 }], edges: [{ id: 'a', from: 'internet', to: 'api' }, { id: 'b', from: 'api', to: 'db' }] };
   await page.evaluate(({ key, save }) => localStorage.setItem(key, JSON.stringify(save)), { key: SAVE_KEY, save: { version: SAVE_VERSION, design, chapter: 0, unlocked: 0, guided: false, certificates: [], history: [] } });
-  await page.goto('http://127.0.0.1:5173/#system-lab');
+  await page.goto(`${TEST_URL}/#system-lab`);
   await page.getByRole('button', { name: 'Send traffic', exact: true }).click();
   await page.getByRole('button', { name: 'Inspect API server', exact: true }).click();
   assert.ok(await page.locator('.l1-tiers button').first().isDisabled());

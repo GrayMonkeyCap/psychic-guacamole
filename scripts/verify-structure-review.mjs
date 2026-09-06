@@ -1,3 +1,4 @@
+import { TEST_URL } from './verification-config.mjs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -8,7 +9,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://127.0.0.1:5173/#system-lab');
+  await page.goto(`${TEST_URL}/#system-lab`);
   await page.getByRole('button', { name: 'Let’s build a link' }).click();
   const summary = page.locator('.l1-structure-review summary'), issues = page.getByRole('list', { name: 'Connection issues' });
   await summary.focus(); await page.keyboard.press('Enter');

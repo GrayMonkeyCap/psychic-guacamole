@@ -1,3 +1,4 @@
+import { TEST_URL } from './verification-config.mjs';
 // Isolated behavior experiment QA: no navigation to entered destinations.
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -11,13 +12,13 @@ try {
   const page = await context.newPage(), errors = [], destinationRequests = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('request', request => { if (request.url().includes('bakery.example')) destinationRequests.push(request.url()); });
-  await page.goto('http://127.0.0.1:5173/');
+  await page.goto(`${TEST_URL}/`);
   const design = { nodes: [{ id: 'internet', type: 'internet', tier: 0, x: 7, y: 43 },
     { id: 'api', type: 'api', tier: 1, strategy: 'random', x: 37, y: 43 },
     { id: 'db', type: 'database', tier: 1, x: 69, y: 43 }, { id: 'cache', type: 'cache', tier: 0, x: 69, y: 12 }],
   edges: [{ id: '1', from: 'internet', to: 'api' }, { id: '2', from: 'api', to: 'db' }, { id: '3', from: 'api', to: 'cache' }] };
   await page.evaluate(({ key, save }) => localStorage.setItem(key, JSON.stringify(save)), { key: SAVE_KEY, save: { version: SAVE_VERSION, design, chapter: 0, unlocked: 2, history: [], certificates: [], guided: false } });
-  await page.goto('http://127.0.0.1:5173/#system-lab');
+  await page.goto(`${TEST_URL}/#system-lab`);
   const launch = page.getByRole('button', { name: 'Try creating a real mapping' });
   await launch.click();
   const dialog = page.getByRole('dialog', { name: 'Where does your link live?' });

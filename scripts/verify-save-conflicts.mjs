@@ -1,3 +1,4 @@
+import { TEST_URL } from './verification-config.mjs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -5,7 +6,7 @@ const require = createRequire(path.join(process.argv[2], 'package.json'));
 const { chromium } = require('playwright');
 const browser = await chromium.launch({ headless: true, channel: 'msedge' });
 const key = 'system-sandbox:first-level:v2', recovery = 'system-sandbox:first-level:recovery';
-const url = 'http://127.0.0.1:5173/#system-lab';
+const url = `${TEST_URL}/#system-lab`;
 const saved = page => page.locator('.l1-save-note').filter({ hasText: 'saved on this device' }).waitFor();
 const conflict = page => page.locator('.l1-save-note').filter({ hasText: 'Autosave paused' }).waitFor();
 const open = page => page.getByRole('button', { name: 'Save backups & restore' }).click();
