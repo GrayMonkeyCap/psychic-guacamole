@@ -40,6 +40,7 @@ try {
   // A real behavioral edit discards the recording; no stale path survives it.
   await page.getByRole('button', { name: 'Inspect API server', exact: true }).click();
   await page.locator('.l1-tiers').getByRole('button', { name: /Small/ }).click();
+  await page.getByRole('button', { name: 'Apply Small tier', exact: true }).click();
   assert.equal(await picker.count(), 0);
   await page.getByRole('button', { name: 'Send traffic', exact: true }).click();
   await page.getByText('A USEFUL FAILURE', { exact: true }).waitFor({ timeout: 22000 });

@@ -16,6 +16,7 @@ import { createSaveSession, SAVE_LOCK } from './saveSession.js';
 import SaveConflict from './SaveConflict.jsx';
 import ComponentContract from './ComponentContract.jsx';
 import CompletionRecap from './CompletionRecap.jsx';
+import CapacityPicker from './CapacityPicker.jsx';
 
 const ICONS = { internet: Activity, api: Server, database: Database, cache: Zap, loadBalancer: GitFork, idGenerator: KeyRound, cdn: Cloud };
 const round = n => Math.round(n || 0).toLocaleString();
@@ -456,7 +457,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
             <ComponentContract design={design} node={node} />
             <button className="l1-guide-button" onClick={() => setGuide(node.type)}><BookOpen size={15} /> How this component works <ChevronRight size={14} /></button>
             <button className="l1-guide-button" disabled={sim.running} onClick={() => { setMoveTarget(node.id); setWire(null); }}><MousePointer2 size={15} /> Move without dragging</button>
-            <div className="l1-section-label">CAPACITY <span>GAME UNITS</span></div><div className="l1-tiers">{config.tiers.map((tier, i) => <button disabled={sim.running} key={i} className={node.tier === i ? 'active' : ''} onClick={() => edit({ tier: i })}><strong>{tier.name}</strong><b>${tier.cost}</b><small>{round(tier.capacity)} {node.type === 'database' ? 'reads/s' : 'ops/s'}</small>{tier.writes && <small>{round(tier.writes)} writes/s</small>}</button>)}</div>
+            <CapacityPicker key={`${node.id}:${node.tier}`} design={design} node={node} disabled={sim.running} onApply={tier => edit({ tier })} />
             {node.type === 'api' && <div className="l1-strategy"><label htmlFor="code-strategy">SHORT CODE STRATEGY</label><select id="code-strategy" value={node.strategy || 'sequence'} onChange={e => edit({ strategy: e.target.value })} disabled={sim.running}>{Object.entries(STRATEGIES).map(([key, p]) => <option value={key} key={key}>{p.name}</option>)}</select><p>{STRATEGIES[node.strategy || 'sequence'].description}</p></div>}
             {load && <><div className="l1-node-telemetry"><span>Read work offered <b>{round(load.reads)}/s</b></span><span>Write work offered <b>{round(load.writes)}/s</b></span><span>Requests admitted <b>{round(load.admitted)}/s</b></span><span>Rejected here <b>{round(load.rejected)}/s</b></span>{['cache', 'cdn'].includes(node.type) && <><span>Served from memory <b>{round(load.hits)}/s</b></span><span>Successful fills <b>{round(load.fills)}/s</b></span><span>Skipped optional fills <b>{round(load.skippedFills)}/s</b></span></>}</div>{load.rejected > 0 && <div className="l1-small-warning">{round(metrics.outcomes.filter(o => o.blockedBy === node.id && o.kind === 'read').reduce((n, o) => n + o.rate, 0))} redirects/s and {round(metrics.outcomes.filter(o => o.blockedBy === node.id && o.kind === 'write').reduce((n, o) => n + o.rate, 0))} creations/s stopped here. They made no further dependency calls.</div>}</>}
             {!validation.reachable.has(node.id) && <div className="l1-small-warning">Unconnected: costs money, serves no traffic.</div>}

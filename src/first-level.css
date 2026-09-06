@@ -47,6 +47,14 @@
 .l1-completion-recap li { margin-bottom: 12px; }
 .l1-recap-traces { display: grid; gap: 10px; }
 .l1-recap-traces button { min-height: 44px; white-space: normal; }
+.l1-inspector .l1-capacity-note, .l1-inspector .l1-capacity-preview p { font-size: 13px; line-height: 1.5; color: #435c50; }
+.l1-capacity-preview { margin: 12px 0; padding: 10px; border: 1px solid #b8b897; border-radius: 10px; background: #f5efdb; }
+.l1-capacity-preview table { width: 100%; border-collapse: collapse; font-size: 12px; color: #355b50; }
+.l1-capacity-preview caption { text-align: left; font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+.l1-capacity-preview th, .l1-capacity-preview td { padding: 8px 3px; border-bottom: 1px solid #d8cdb6; text-align: right; overflow-wrap: anywhere; }
+.l1-capacity-preview th:first-child { text-align: left; }
+.l1-capacity-preview .l1-primary { width: 100%; min-height: 44px; }
+.l1-capacity-picker .l1-tiers small { font-size: 11px; }
 .l1-dialog.l1-link-lab-dialog { width: 660px; }
 .l1-link-lab-dialog .l1-link-experiment p { font-size: 16px; color: var(--ink); line-height: 1.5; overflow-wrap: anywhere; }
 .l1-link-experiment label { display: grid; gap: 8px; font-size: 14px; font-weight: 600; }
