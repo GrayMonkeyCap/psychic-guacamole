@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Cloud, Database, FlaskConical, Gauge, GitFork, KeyRound, Link2, MousePointer2, Pause, Play, Plus, RotateCcw, Server, SkipForward, Star, Trash2, Undo2, X, Zap } from 'lucide-react';
-import { CATALOG, CHAPTERS, EMPTY_DESIGN, EFFICIENCY_TARGET, LIMIT, STRATEGIES, MODEL_VERSION, SAVE_KEY, SAVE_VERSION, CONTRACT_RULES, connectionError, costOf, isCurrentResult, passedChapters, recordCertificate, report, restoreSave, tick, traceRequest, validate } from './levelModel';
+import { CATALOG, CHAPTERS, EMPTY_DESIGN, EFFICIENCY_TARGET, LIMIT, STRATEGIES, MODEL_VERSION, SAVE_KEY, SAVE_VERSION, CONTRACT_RULES, connectionError, costOf, isCurrentResult, passedChapters, recordCertificate, restoreSave, traceRequest, validate } from './levelModel';
 import OutcomePicker from './OutcomePicker';
 import { componentLabel, traceOutcome } from './trafficEvidence.js';
 import LinkExperiment from './LinkExperiment.jsx';
@@ -20,6 +20,7 @@ import CapacityPicker from './CapacityPicker.jsx';
 import StructureReview, { LocalStructureIssues } from './StructureReview.jsx';
 import SystemNavigator from './SystemNavigator.jsx';
 import { useTrafficMotion } from './motionPreferences.js';
+import { advancePlaybackRun, createPlaybackRun, playbackDelay } from './playback.js';
 
 const ICONS = { internet: Activity, api: Server, database: Database, cache: Zap, loadBalancer: GitFork, idGenerator: KeyRound, cdn: Cloud };
 const round = n => Math.round(n || 0).toLocaleString();
@@ -156,6 +157,8 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const saveRevision = useRef(0);
   const [edits, setEdits] = useState(emptyEditHistory);
   const [sim, setSim] = useState({ running: false, paused: false, frames: [], report: null, suite: false });
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const resultsPanel = useRef(null);
   const [scrub, setScrub] = useState(null);
   const [trace, setTrace] = useState(null);
   const [recapOpen, setRecapOpen] = useState(false);
@@ -167,7 +170,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const [traceHot, setTraceHot] = useState(false);
   const [helpSteps, setHelpSteps] = useState({});
   const [size, setSize] = useState({ width: 800, height: 560 });
-  const board = useRef(null), drag = useRef(null), suppressClick = useRef(false), timerState = useRef(null), priorState = useRef(null);
+  const board = useRef(null), drag = useRef(null), suppressClick = useRef(false), timerState = useRef(null);
   const chapter = CHAPTERS[chapterId], validation = useMemo(() => validate(design), [design]);
   const cost = costOf(design.nodes);
   const node = design.nodes.find(n => n.id === selected);
@@ -208,7 +211,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
     setHistory(next.history); setCertificates(next.certificates); setEdits(emptyEditHistory());
     setExperimentState(createLinkExperiment()); setHelpSteps({});
     setSelected('internet'); setSelectedEdge(null); setTrace(null); setScrub(null); setWire(null); setMoveTarget(null);
-    timerState.current = null; priorState.current = null;
+    timerState.current = null;
     setSim({ running: false, paused: false, frames: [], report: null, suite: false });
     return {};
   }
@@ -294,41 +297,47 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
   }, [welcome, guide, modelGuide, experimentOpen, backupsOpen, undo, redo, remove, sim.running, change, design, navigatorOpen, recapOpen]);
 
+  const advancePlayback = useCallback((keepPaused = false) => {
+    const run = timerState.current, event = advancePlaybackRun(run);
+    if (!event) return;
+    timerState.current = event.next;
+    setTrace(null); setScrub(null);
+    if (event.completed) {
+      const { frames, ...summary } = event.completed;
+      setHistory(history => [...history.slice(-11), summary]);
+      setCertificates(certificates => recordCertificate(certificates, summary));
+      if (event.completed.passed) setUnlocked(value => Math.max(value, Math.min(2, run.chapter + 1)));
+      if (!event.next && run.suite && event.completed.passed) onLevelResult({ stars: costOf(run.design.nodes) <= EFFICIENCY_TARGET ? 3 : 2 });
+    }
+    setChapterId(event.chapter);
+    setSim({ running: Boolean(event.next), paused: Boolean(event.next) && keepPaused, frames: event.frames, report: event.report, suite: event.suite });
+    if (keepPaused && !event.next) requestAnimationFrame(() => resultsPanel.current?.focus());
+  }, [onLevelResult]);
+
   useEffect(() => {
     if (!sim.running || sim.paused) return;
-    const interval = setInterval(() => {
-      const run = timerState.current;
-      if (!run) return;
-      run.step += 1;
-      const time = run.step / 5;
-      const frame = tick(run.design, CHAPTERS[run.chapter], time, priorState.current);
-      priorState.current = frame; run.frames.push(frame);
-      if (run.step >= CHAPTERS[run.chapter].duration * 5) {
-        const result = report(run.design, CHAPTERS[run.chapter], run.frames);
-        const { frames, ...summary } = result;
-        setHistory(h => [...h.slice(-11), summary]);
-        setCertificates(c => recordCertificate(c, summary));
-        if (result.passed) setUnlocked(u => Math.max(u, Math.min(2, run.chapter + 1)));
-        if (run.suite && result.passed && run.chapter < 2) {
-          run.chapter += 1; run.step = 0; run.frames = []; priorState.current = null;
-          setChapterId(run.chapter); setSim({ running: true, paused: false, frames: [], report: null, suite: true });
-        } else {
-          timerState.current = null;
-          setSim({ running: false, paused: false, frames: [...run.frames], report: result, suite: run.suite });
-          if (run.suite && result.passed && run.chapter === 2) onLevelResult({ stars: costOf(run.design.nodes) <= EFFICIENCY_TARGET ? 3 : 2 });
-        }
-      } else setSim(s => ({ ...s, frames: [...run.frames] }));
-    }, 200);
+    const interval = setInterval(() => { if (!document.hidden) advancePlayback(); }, playbackDelay(playbackRate));
     return () => clearInterval(interval);
-  }, [sim.running, sim.paused, onLevelResult]);
+  }, [sim.running, sim.paused, playbackRate, advancePlayback]);
 
+  useEffect(() => {
+    const visibility = () => {
+      if (document.hidden && sim.running && !sim.paused) {
+        setSim(current => ({ ...current, paused: true }));
+        setNotice('Traffic paused while this tab was hidden. Resume when you are ready; no samples were skipped.');
+      }
+    };
+    document.addEventListener('visibilitychange', visibility);
+    visibility();
+    return () => document.removeEventListener('visibilitychange', visibility);
+  }, [sim.running, sim.paused]);
   function start(suite = false) {
     if (sim.running) return;
     setRecapOpen(false);
     if (!validation.valid) { setNotice(validation.issues[0].text); setSelected(validation.issues[0].node); return; }
     if (cost > LIMIT) { setNotice(`Your design is $${cost - LIMIT} over budget. Choose smaller tiers or remove unused components.`); return; }
     const id = suite ? 0 : chapterId;
-    timerState.current = { step: 0, chapter: id, frames: [], design, suite }; priorState.current = null;
+    timerState.current = createPlaybackRun(design, id, suite);
     setChapterId(id); setWire(null); setMoveTarget(null); setTrace(null); setScrub(null);
     setSim({ running: true, paused: false, frames: [], report: null, suite });
   }
@@ -432,6 +441,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
         <StructureReview design={design} validation={validation} onInspect={inspectIssue} />
         <button className="l1-text-button" onClick={() => setModelGuide(true)}><FlaskConical size={15} /> How tests are measured</button>
         <div className="l1-motion-setting"><label><input type="checkbox" checked={motion.animated} disabled={motion.reduced} onChange={event => motion.change(event.target.checked)} /> Animate traffic paths</label><p>{motion.reduced ? 'Off: your system requests reduced motion.' : 'Turning animation off keeps simulation and recorded evidence running.'}</p></div>
+        <div className="l1-playback-setting"><label>Playback speed<select value={playbackRate} onChange={event => setPlaybackRate(Number(event.target.value))}><option value="1">1× · Watch closely</option><option value="2">2× · Faster replay</option><option value="4">4× · Quick test</option></select></label><p>Same 0.2-second model samples at every speed. Hidden tabs pause; resume explicitly when ready.</p></div>
         <button className="l1-guide-button" disabled={sim.running && !sim.paused} onClick={() => setExperimentOpen(true)}><Link2 size={16} /> Try creating a real mapping <ChevronRight size={14} /></button>
         <button className="l1-text-button" disabled={helpStep === 2} onClick={() => setHelpSteps(steps => ({ ...steps, [help.key]: Math.min(2, helpStep + 1) }))}><BookOpen size={15} />{helpStep < 0 ? 'Give me a nudge' : helpStep === 0 ? 'Show the evidence' : helpStep === 1 ? 'Suggest an experiment' : 'All hints shown'}</button>
         {helpStep >= 0 && <section className="l1-help-ladder" aria-label="Contextual help"><strong>{help.question}</strong>{helpStep >= 1 && <p>{help.evidence}</p>}{helpStep >= 2 && <p>{help.experiment}</p>}{helpStep >= 1 && help.node && <button className="l1-text-button" onClick={() => { setSelected(help.node); setSelectedEdge(null); setTrace(null); setWire(null); if (sim.report) setScrub(sim.report.worstIndex); }}>Inspect the evidence</button>}<button className="l1-text-button" onClick={() => setHelpSteps(steps => ({ ...steps, [help.key]: -1 }))}>Dismiss help</button></section>}
@@ -505,7 +515,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
       </aside>
     </main>
 
-    {sim.report && <section className={`l1-postmortem ${sim.report.passed ? 'passed' : 'failed'}`} aria-label="Traffic test results">
+    {sim.report && <section ref={resultsPanel} tabIndex={-1} className={`l1-postmortem ${sim.report.passed ? 'passed' : 'failed'}`} aria-label="Traffic test results">
       <div className="l1-result-title"><span>{sim.report.passed ? <Check size={23} /> : <Activity size={23} />}</span><div><small>{sim.report.passed ? 'CHALLENGE PASSED' : 'A USEFUL FAILURE'}</small><strong>{sim.report.passed ? certified ? 'Every challenge, one design.' : 'Your link held up.' : 'Now you know where it hurts.'}</strong></div></div>
       <div className="l1-result-explanation"><p>{sim.report.reason}</p><small>Worst success: {(100 - sim.report.maxError).toFixed(1)}% · Highest estimated latency: {latencyLabel(sim.report.estimatedLatencyMs)} · ${sim.report.cost}/mo</small>
         {!sim.report.passed && <button className="l1-text-button" onClick={() => { setSelected(sim.report.bottleneck); setSelectedEdge(null); setTrace(null); }}>{sim.report.alternatives}</button>}
@@ -519,7 +529,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
       <div className="l1-system-state"><span className={`l1-status-orb ${metrics && (metrics.errorRate > CONTRACT_RULES.maxError || metrics.estimatedLatencyMs > CONTRACT_RULES.maxLatencyMs) ? 'danger' : sim.running ? 'live' : ''}`} /><div><small>{sim.running ? sim.suite ? 'FULL CONTRACT TEST' : 'TRAFFIC TEST' : sim.report ? 'REPLAY & INSPECT' : 'BUILD MODE'}</small><strong>{sim.running ? sim.paused ? 'Paused. Take a look.' : `${chapter.name} · ${(metrics?.time || 0).toFixed(0)} / ${chapter.duration}s` : sim.report ? 'Drag the timeline to inspect' : validation.valid ? 'Ready for visitors' : 'Connect your first system'}</strong></div></div>
       <div className="l1-metrics"><div><small>INCOMING</small><strong>{metrics ? round(metrics.rps) : '—'}<i>/s</i></strong></div><div className={metrics?.estimatedLatencyMs > CONTRACT_RULES.maxLatencyMs ? 'bad' : ''}><small>EST. LATENCY</small><strong>{metrics?.estimatedLatencyMs ?? '—'}<i>ms</i></strong></div><div className={metrics?.errorRate > CONTRACT_RULES.maxError ? 'bad' : ''}><small>SUCCESS</small><strong>{metrics ? (100 - metrics.errorRate).toFixed(1) : '—'}<i>%</i></strong></div></div>
       <Plot frames={sim.frames} index={scrub} onScrub={!sim.running && sim.frames.length ? index => { setTrace(null); setScrub(index); } : undefined} />
-      <div className="l1-run-buttons">{sim.running ? <><button className="l1-secondary" onClick={() => { setTrace(null); setSim(s => ({ ...s, paused: !s.paused })); }} aria-label={sim.paused ? 'Resume traffic' : 'Pause traffic'}>{sim.paused ? <Play size={18} /> : <Pause size={18} />}</button><button className="l1-secondary" onClick={() => { timerState.current = null; setSim(s => ({ ...s, running: false, paused: false })); }} title="Stop test and edit">Edit <X size={16} /></button></> : <><button className="l1-secondary" disabled={unlocked < 2} onClick={() => start(true)} title={unlocked < 2 ? 'Complete the challenges to unlock full-contract testing' : 'Test this design against all three challenges'}><SkipForward size={16} /><span>All three</span></button><button className="l1-primary" onClick={() => start(false)}><Play size={18} fill="currentColor" />{sim.frames.length ? 'Try again' : 'Send traffic'}</button></>}</div>
+      <div className="l1-run-buttons">{sim.running ? <><button className="l1-secondary" onClick={() => { setTrace(null); setSim(s => ({ ...s, paused: !s.paused })); }} aria-label={sim.paused ? 'Resume traffic' : 'Pause traffic'}>{sim.paused ? <Play size={18} /> : <Pause size={18} />}</button>{sim.paused && <button className="l1-secondary" onClick={() => advancePlayback(true)}>Step 0.2s</button>}<button className="l1-secondary" onClick={() => { timerState.current = null; setSim(s => ({ ...s, running: false, paused: false })); }} title="Stop test and edit">Edit <X size={16} /></button></> : <><button className="l1-secondary" disabled={unlocked < 2} onClick={() => start(true)} title={unlocked < 2 ? 'Complete the challenges to unlock full-contract testing' : 'Test this design against all three challenges'}><SkipForward size={16} /><span>All three</span></button><button className="l1-primary" onClick={() => start(false)}><Play size={18} fill="currentColor" />{sim.frames.length ? 'Try again' : 'Send traffic'}</button></>}</div>
     </footer>
     {notice && <div className="l1-notice" role="alert"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss message"><X size={18} /></button></div>}
     {welcome && <Briefing onClose={closeWelcome} />}

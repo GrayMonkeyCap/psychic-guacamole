@@ -76,6 +76,9 @@
 .l1-motion-setting label { display: flex; gap: 9px; align-items: center; min-height: 44px; font-size: 13px; color: #355b50; cursor: pointer; }
 .l1-motion-setting input { width: 18px; height: 18px; accent-color: #477a67; flex-shrink: 0; }
 .l1-mission .l1-motion-setting p { margin: 3px 0 8px; font-size: 12px; line-height: 1.5; color: #435c50; }
+.l1-playback-setting label { display: grid; gap: 8px; font-size: 13px; color: #355b50; }
+.l1-playback-setting select { width: 100%; min-height: 40px; padding: 7px; border: 1px solid var(--stroke); border-radius: 8px; background: var(--paper); color: #355b50; font: inherit; }
+.l1-mission .l1-playback-setting p { font-size: 12px; line-height: 1.5; color: #435c50; }
 .l1-dialog.l1-link-lab-dialog { width: 660px; }
 .l1-link-lab-dialog .l1-link-experiment p { font-size: 16px; color: var(--ink); line-height: 1.5; overflow-wrap: anywhere; }
 .l1-link-experiment label { display: grid; gap: 8px; font-size: 14px; font-weight: 600; }

@@ -75,7 +75,13 @@ Participating tabs coordinate compare-and-write using the browser Web Locks API.
 
 Unavailable storage or Web Locks disables automatic writes, displays an unsaved warning and leaves file export usable. Restoring requires successful checkpoint/primary writes. A retry action is available; keep the tab open or export before leaving while unsaved. The coordination protocol cannot constrain older builds or outside scripts that ignore its lock. Clearing browser data removes all browser-local slots. Cross-device/account persistence, browser-crash guarantees and automatic conflict merging are not provided.
 
-## Verification for this slice
+## Playback contract
+
+The playback controller advances one fixed 0.2-second sample at a time. The 1×/2×/4× setting changes only wall-clock scheduling (200/100/50 ms per sample), not model time, offered work, cache warming or reporting. A paused player can advance exactly one sample; completing a challenge by stepping focuses its result. Full-contract transitions reset per-challenge cache state and can remain paused for manual inspection. The browser does not attempt elapsed-time catch-up after being hidden: visibility loss pauses the run, and returning requires explicit Resume. Background-event behavior is covered with a deterministic visibility fixture, not a claim about every browser/OS lifecycle.
+
+Motion preferences independently control particles, including illustrative traces. The player preference is browser-local when available and overridden by a live OS reduced-motion request. Neither motion nor playback speed is part of a design fingerprint or pass criteria.
+
+## Verification
 
 Run `npm test` and `npm run build`.
 
@@ -88,4 +94,4 @@ Run `npm test` and `npm run build`.
 
 `scripts/verify-outcomes.mjs` checks pause/resume, filters, recorded miss/hit paths, scrubbing, editing invalidation and actual rejection feedback in an isolated browser context. `scripts/verify-link-experiment.mjs` checks create/open, cache loss, collision protection, modal focus, close/reopen, reset confirmation and absence of URL requests/persistence. Both check mobile overflow. Pass the bundled Playwright package directory as their argument, as with the existing browser scripts.
 
-108 unit/static-render tests pass as of 6 September 2026; the production build succeeds. Additional browser scripts cover edit history, connection previews, contextual help, portable backups and two-tab/blocked-storage behavior. These checks do not establish novice learning, full assistive-technology access or comprehensive visual QA. The broader backlog readiness gate remains open.
+136 unit/static-render tests pass as of 6 September 2026; the production build succeeds. Additional browser scripts cover edit history, connection previews, contextual help, portable backups, two-tab/blocked-storage behavior, component contracts, pass recaps, capacity previews, structural review, text navigation, motion and controlled playback. These checks do not establish novice learning, full assistive-technology access or comprehensive visual QA. The broader backlog readiness gate remains open.
