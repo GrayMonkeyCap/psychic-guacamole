@@ -343,3 +343,33 @@
 @media (max-width: 1100px) { .l1-shell { min-height: 900px; height: auto; overflow: visible; } .l1-layout { grid-template-columns: minmax(0, 1fr) 245px; grid-template-rows: auto 600px; overflow: visible; } .l1-mission { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px 20px; overflow: visible; } .l1-mission h1 { margin: 0; grid-row: 2; } .l1-mission > p { grid-row: 3; grid-column: 1; margin: 0; } .l1-mission .l1-eyebrow { grid-column: 1 / -1; } .l1-link-example, .l1-mission-foot { display: none; } .l1-contract { grid-column: 2; grid-row: 2 / 4; } .l1-forecast { grid-column: 3; grid-row: 2 / 4; margin: 0; padding: 0; border: 0; } .l1-rules { grid-column: 2 / -1; margin: 0; grid-template-columns: 1fr 1fr 1fr; gap: 10px; } .l1-rules span { flex-direction: column; gap: 3px; } .l1-mission .l1-hint { grid-column: 1 / -1; grid-row: auto; } .l1-chapters span small { display: none; } .l1-chapters span strong { font-size: 9px; } .l1-chapters b { width: 23px; height: 25px; font-size: 9px; } .l1-header .factory-back { min-width: 150px; padding-inline: 8px; } .l1-header .factory-back strong { font-size: 12px; } .l1-header .factory-back small { font-size: 6px; } .l1-budget-ring { display: none; } .l1-header .factory-budget { min-width: 124px; } .l1-controls { flex-wrap: wrap; } .l1-plot { min-width: 100px; } .l1-run-buttons { margin-left: auto; } .l1-postmortem { flex-wrap: wrap; } .l1-result-explanation { min-width: 250px; } .l1-result-actions { max-width: none; width: 100%; flex-direction: row; align-items: center; } }
 @media (max-width: 650px) { .l1-header { height: auto; grid-template-columns: 1fr auto; } .l1-shell { grid-template-rows: auto auto auto auto; } .l1-chapters { grid-column: 1 / -1; grid-row: 2; } .l1-chapters button { flex: 1; } .l1-header .factory-back { width: auto; } .l1-layout { display: flex; flex-direction: column; } .l1-mission { display: block; } .l1-mission h1 { font-size: 23px; margin-top: 12px; } .l1-mission h1 br { display: inline; } .l1-mission h1 br::after { content: ' '; } .l1-mission > p { margin-top: 8px; } .l1-contract { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; } .l1-contract > small { width: 100%; } .l1-contract > div { font-size: 9px; margin: 0; } .l1-forecast { margin-top: 14px; } .l1-rules { display: flex; justify-content: space-between; margin: 12px 0; } .l1-workspace { height: 630px; flex-shrink: 0; } .l1-inspector { max-height: 480px; } .l1-controls { padding: 14px; gap: 15px; } .l1-system-state { min-width: 150px; } .l1-metrics { margin-left: auto; gap: 10px; } .l1-metrics strong { font-size: 16px; } .l1-run-buttons { flex: 1; justify-content: end; } .l1-dialog { padding: 25px; } .l1-dialog h1 { font-size: 34px; } .l1-postmortem { padding: 14px; } .l1-result-title { max-width: none; } .l1-result-explanation { flex: 0 0 100%; } }
 @media (prefers-reduced-motion: reduce) { .l1-shell *, .l1-shell *::before, .l1-shell *::after { animation: none !important; transition: none !important; } }
+
+/* Essential reading surfaces: keep the clay materials, increase ink contrast and avoid tiny telemetry. */
+.l1-mission p, .l1-inspector p { color: #435c50; font-size: 13px; }
+.l1-node-head small, .l1-node-readout small { color: #435c50; font-size: 10px; }
+.l1-node.overloaded .l1-node-readout b { color: #914429; }
+.l1-tools small { color: #435c50; font-size: 10px; }
+.l1-tools strong { font-size: 12px; }
+.l1-contract > small, .l1-forecast > small, .l1-inspector .l1-eyebrow, .l1-section-label, .l1-strategy label { color: #435c50; font-size: 11px; }
+.l1-contract > div { color: #435c50; font-size: 12px; }
+.l1-contract > .complete { color: #355f48; }
+.l1-forecast span, .l1-rules, .l1-rules b { color: #435c50; font-size: 12px; }
+.l1-forecast > b { color: #805326; font-size: 12px; }
+.l1-inspector-heading small, .l1-save-note { color: #435c50; font-size: 11px; line-height: 1.6; }
+.l1-guide-button { color: #355b50; font-size: 12px; min-height: 44px; }
+.l1-strategy select { font-size: 13px; min-height: 44px; }
+.l1-tiers > button { color: #435c50; }
+.l1-tiers > button.active { color: #705329; }
+.l1-tiers strong { font-size: 11px; }
+.l1-node-telemetry span, .l1-node-telemetry b { color: #435c50; font-size: 12px; }
+.l1-trace-steps button { color: #435c50; font-size: 13px; }
+.l1-trace-steps button.active { color: #705329; }
+.l1-trace-steps small { opacity: 1; color: #435c50; font-size: 10px; }
+.l1-trace-detail > strong { font-size: 13px; }
+.l1-metrics small, .l1-metrics i { color: #435c50; font-size: 11px; }
+.l1-metrics .bad strong { color: #914429; }
+.l1-system-state small, .l1-system-state strong { color: #435c50; font-size: 11px; }
+.l1-result-title small { color: #435c50; font-size: 11px; }
+.l1-result-title strong { color: #355b50; font-size: 14px; }
+.l1-result-explanation { color: #435c50; font-size: 13px; }
+.l1-result-explanation > small, .l1-result-actions > small { color: #435c50; font-size: 11px; }

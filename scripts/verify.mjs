@@ -7,8 +7,8 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-export const FULL_CHECKS = ['campaign', 'editor', 'level', 'outcomes', 'link-experiment', 'edit-history', 'connections', 'help', 'backups', 'save-conflicts', 'component-contracts', 'completion-recap', 'capacity-preview', 'structure-review', 'system-navigator', 'traffic-motion', 'playback', 'run-modes', 'design-shelf', 'design-comparison'];
-export const SMOKE_CHECKS = ['campaign', 'connections', 'backups', 'save-conflicts', 'system-navigator', 'playback', 'run-modes', 'design-shelf', 'design-comparison'];
+export const FULL_CHECKS = ['campaign', 'editor', 'level', 'outcomes', 'link-experiment', 'edit-history', 'connections', 'help', 'backups', 'save-conflicts', 'component-contracts', 'completion-recap', 'capacity-preview', 'structure-review', 'system-navigator', 'traffic-motion', 'playback', 'run-modes', 'design-shelf', 'design-comparison', 'readability'];
+export const SMOKE_CHECKS = ['campaign', 'connections', 'backups', 'save-conflicts', 'system-navigator', 'playback', 'run-modes', 'design-shelf', 'design-comparison', 'readability'];
 
 export function parseOptions(args, env = process.env) {
   const options = { runtime: env.PLAYWRIGHT_NODE_MODULES || path.join(root, 'node_modules'), suite: 'full', port: 5181 };

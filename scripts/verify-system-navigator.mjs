@@ -15,6 +15,12 @@ try {
   for (const name of ['API server', 'API server', 'Database', 'Load balancer']) await page.getByRole('button', { name: `Add ${name}`, exact: true }).click();
   const nav = page.getByRole('region', { name: 'Text system navigator' });
   const press = async locator => { await locator.focus(); await page.keyboard.press('Enter'); };
+  const focused = async locator => {
+    // Inspector focus is intentionally applied on the next animation frame.
+    const element = await locator.elementHandle();
+    await page.waitForFunction(target => target === document.activeElement, element, { timeout: 5000 });
+    assert.ok(await locator.evaluate(target => target === document.activeElement));
+  };
   const open = () => press(page.getByRole('button', { name: 'System list', exact: true }));
   async function connect(from, to) {
     await open();
@@ -30,11 +36,11 @@ try {
   assert.ok((await page.locator('.l1-system-state').innerText()).includes('Ready for visitors'));
   assert.equal(await page.locator('[data-node-id]').filter({ hasText: 'API 2' }).count(), 1);
   await open();
-  assert.ok(await nav.getByRole('heading', { name: 'Your system, in words.' }).evaluate(el => el === document.activeElement));
+  await focused(nav.getByRole('heading', { name: 'Your system, in words.' }));
   assert.equal(await nav.getByRole('list', { name: 'System service calls' }).getByRole('listitem').count(), 5);
   await press(nav.getByRole('button', { name: 'Inspect API server 2', exact: true }));
   const heading = page.getByRole('heading', { name: 'API server 2', exact: true });
-  assert.ok(await heading.evaluate(el => el === document.activeElement));
+  await focused(heading);
   assert.ok(await page.getByRole('button', { name: 'Move without dragging' }).isVisible());
   await open();
   await press(nav.getByRole('button', { name: 'Inspect call from API server 2 to Database', exact: true }));
@@ -50,7 +56,7 @@ try {
   await page.getByRole('button', { name: 'End run', exact: true }).click();
   await page.getByRole('button', { name: 'End run & edit', exact: true }).click();
   await nav.getByRole('button', { name: 'Close system list' }).click();
-  assert.ok(await page.getByRole('button', { name: 'System list', exact: true }).evaluate(el => el === document.activeElement));
+  await focused(page.getByRole('button', { name: 'System list', exact: true }));
   for (const width of [320, 768]) {
     await page.setViewportSize({ width, height: 844 }); await open();
     await nav.getByRole('button', { name: 'Inspect API server 2', exact: true }).scrollIntoViewIfNeeded();
