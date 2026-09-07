@@ -10,6 +10,8 @@
 .l1-learning-resources li + li { margin-top: 14px; }
 .l1-learning-resources a { color: #245b74; text-decoration: underline; text-underline-offset: 3px; font-weight: 800; }
 .l1-choices-dialog { width: 660px !important; }
+.l1-dialog.l1-choices-dialog, .l1-dialog.l1-workload-dialog { min-width: 0; max-width: calc(100vw - 50px); }
+.l1-dialog .l1-sticky-back { position: sticky; top: 0; z-index: 2; display: flex; width: 100%; min-height: 44px; padding: 10px 8px; margin-bottom: 12px; border-bottom: 1px solid #c8c6ab; border-radius: 8px; background: #fff7e4; color: #35564e; font-size: 13px; box-shadow: 0 4px 0 #fff7e4; }
 .l1-choice-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .l1-choice-options button { text-align: left; padding: 12px; border: 2px solid #c9c4aa; border-radius: 12px; background: #fff9e9; color: #35564e; }
 .l1-choice-options button[aria-pressed="true"] { border-color: #35564e; background: #dce9d6; }

@@ -644,7 +644,7 @@ function WorkloadDialog({ onClose, ...props }) {
   const ref = useRef(null);
   useFocusDialog(ref, onClose);
   return <div className="l1-shade"><section ref={ref} className="l1-dialog l1-workload-dialog" role="dialog" aria-modal="true" aria-labelledby="workload-title">
-    <button className="l1-text-button" onClick={onClose}>Back to your traffic</button>
+    <button className="l1-text-button l1-sticky-back" onClick={onClose}>Back to your traffic</button>
     <h2 id="workload-title">Equal traffic. Different work.</h2>
     <strong className="l1-workload-label">OPTIONAL EXPERIMENT · UNGRADED</strong>
     <WorkloadLab {...props} />
@@ -656,7 +656,7 @@ function ComponentChoices({ design, chapter, frame, disabled, onClose, onAdd }) 
   useFocusDialog(ref, onClose);
   const config = CATALOG[type];
   return <div className="l1-shade"><section ref={ref} className="l1-dialog l1-choices-dialog" role="dialog" aria-modal="true" aria-labelledby="choices-title">
-    <button className="l1-text-button" onClick={onClose}>Back to building</button>
+    <button className="l1-text-button l1-sticky-back" onClick={onClose}>Back to building</button>
     <h2 id="choices-title">What job needs doing?</h2>
     <p>Explore a choice before placing it. There is no required shopping list: keep what earns its place.</p>
     <div className="l1-choice-options" aria-label="Explore components">{Object.entries(CATALOG).map(([key, item]) => <button key={key} aria-pressed={type === key} onClick={() => setType(key)}><strong>{item.name}</strong><span>{item.verb}</span></button>)}</div>

@@ -63,12 +63,18 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
     assert.ok(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
     assert.ok(await tableRegion.evaluate(el => el.scrollWidth >= el.clientWidth));
+    await dialog.evaluate(el => { el.scrollTop = el.scrollHeight; });
+    const back = await close.boundingBox(), panel = await dialog.boundingBox();
+    assert.ok(panel.x >= 0 && panel.x + panel.width <= width, 'The entire fixed dialog fits the viewport.');
+    assert.ok(back.height >= 44 && back.y >= panel.y && back.y + back.height <= panel.y + panel.height, 'Back stays visible below the experiment results.');
+    await page.waitForFunction(el => { const box = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)); }, await close.elementHandle(), { timeout: 3000 });
   }
   await dialog.getByLabel('Shared peak traffic').selectOption('500');
   assert.equal(await results.count(), 0, 'Changing input clears stale results.');
   await dialog.getByRole('button', { name: 'Compare these workloads', exact: true }).click();
   assert.ok((await results.innerText()).includes('same 500 requests/sec'));
-  await page.keyboard.press('Escape');
+  await dialog.evaluate(el => { el.scrollTop = el.scrollHeight; });
+  await close.click();
   assert.equal(await page.locator('.l1-bars i').count(), recordingBefore);
   assert.equal(await page.locator('.l1-system-state').innerText(), sampleBefore);
   assert.equal(await page.evaluate(key => localStorage.getItem(key), SAVE_KEY), savedBefore);

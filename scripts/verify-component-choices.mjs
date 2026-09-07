@@ -51,8 +51,13 @@ try {
     assert.ok((await dialog.getByRole('button', { name: 'Place Memory cache', exact: true }).boundingBox()).y < 900);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
     assert.ok(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
+    await dialog.evaluate(el => { el.scrollTop = el.scrollHeight; });
+    const back = await choices.boundingBox(), panel = await dialog.boundingBox();
+    assert.ok(panel.x >= 0 && panel.x + panel.width <= width, 'The entire fixed dialog fits the viewport.');
+    assert.ok(back.height >= 44 && back.y >= panel.y && back.y + back.height <= panel.y + panel.height, 'Back stays reachable at the bottom of long reading.');
+    await page.waitForFunction(el => { const box = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)); }, await choices.elementHandle(), { timeout: 3000 });
   }
-  await page.keyboard.press('Escape');
+  await choices.click();
   assert.equal(await dialog.count(), 0);
   assert.ok(await trigger.evaluate(el => el === document.activeElement));
   await page.setViewportSize({ width: 1440, height: 1000 });
