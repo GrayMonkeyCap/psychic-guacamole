@@ -22,6 +22,8 @@ import SystemNavigator from './SystemNavigator.jsx';
 import { useTrafficMotion } from './motionPreferences.js';
 import { advancePlaybackRun, createPlaybackRun, playbackDelay } from './playback.js';
 import { playbackMode, stopPlayback } from './playbackMode.js';
+import DesignShelf from './DesignShelf.jsx';
+import { loadDesignSnapshot, removeDesignSnapshot, saveDesignSnapshot } from './designSnapshots.js';
 
 const ICONS = { internet: Activity, api: Server, database: Database, cache: Zap, loadBalancer: GitFork, idGenerator: KeyRound, cdn: Cloud };
 const round = n => Math.round(n || 0).toLocaleString();
@@ -41,8 +43,8 @@ function useFocusDialog(ref, close) {
     const key = e => {
       if (e.key === 'Escape') close();
       if (e.key !== 'Tab') return;
-      const targets = ref.current?.querySelectorAll('button:not(:disabled), a[href], input, select');
-      if (!targets?.length) return;
+      const targets = ref.current?.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled)');
+      if (!targets?.length) { e.preventDefault(); return; }
       if (e.shiftKey && document.activeElement === targets[0]) { e.preventDefault(); targets[targets.length - 1].focus(); }
       else if (!e.shiftKey && document.activeElement === targets[targets.length - 1]) { e.preventDefault(); targets[0].focus(); }
     };
@@ -139,6 +141,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const [unlocked, setUnlocked] = useState(saved?.unlocked || 0);
   const [history, setHistory] = useState(saved?.history || []);
   const [certificates, setCertificates] = useState(saved?.certificates || []);
+  const [snapshots, setSnapshots] = useState(saved?.snapshots || []);
   const [guided, setGuided] = useState(forceTutorial || saved?.guided !== false);
   const [welcome, setWelcome] = useState(forceTutorial || !saved);
   const [guide, setGuide] = useState(null);
@@ -146,6 +149,8 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const [experimentOpen, setExperimentOpen] = useState(false);
   const [experimentState, setExperimentState] = useState(createLinkExperiment);
   const [backupsOpen, setBackupsOpen] = useState(false);
+  const [shelfOpen, setShelfOpen] = useState(false), [shelfBusy, setShelfBusy] = useState(false);
+  const shelfWriting = useRef(false);
   const [recovery, setRecovery] = useState(() => { try { return restoreSave(localStorage.getItem(RECOVERY_KEY)); } catch { return null; } });
   const [selected, setSelected] = useState('internet');
   const [wire, setWire] = useState(null);
@@ -191,8 +196,37 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const closeModelGuide = useCallback(() => setModelGuide(false), []);
   const closeExperiment = useCallback(() => setExperimentOpen(false), []);
   const closeBackups = useCallback(() => setBackupsOpen(false), []);
+  const closeShelf = useCallback(() => { if (!shelfWriting.current) setShelfOpen(false); }, []);
   const closeStopConfirm = useCallback(() => setStopConfirm(false), []);
-  const currentSave = { version: SAVE_VERSION, design, chapter: chapterId, unlocked, guided, history, certificates };
+  const currentSave = { version: SAVE_VERSION, design, chapter: chapterId, unlocked, guided, history, certificates, snapshots };
+  function adoptSave(next) {
+    setDesign(next.design); setChapterId(next.chapter); setUnlocked(next.unlocked); setGuided(next.guided);
+    setHistory(next.history); setCertificates(next.certificates); setSnapshots(next.snapshots || []); setEdits(emptyEditHistory());
+    setExperimentState(createLinkExperiment()); setHelpSteps({}); setNavigatorOpen(false); setRecapOpen(false);
+    setSelected('internet'); setSelectedEdge(null); setTrace(null); setScrub(null); setWire(null); setMoveTarget(null);
+    timerState.current = null;
+    setSim({ running: false, paused: false, frames: [], report: null, suite: false });
+  }
+  async function shelfAction(action) {
+    if (shelfWriting.current || sim.running) return { error: 'Finish the current action before changing the shelf.' };
+    let next;
+    try {
+      next = action.type === 'save' ? saveDesignSnapshot(currentSave, action.name, uid()) : action.type === 'load' ? loadDesignSnapshot(currentSave, action.id, uid()) : removeDesignSnapshot(currentSave, action.id);
+    } catch (error) { return { error: error.message }; }
+    shelfWriting.current = true; setShelfBusy(true);
+    const revision = ++saveRevision.current;
+    setSaveStatus({ status: 'saving' });
+    try {
+      const result = await saveSession.write(next);
+      if (revision !== saveRevision.current) return { error: 'The browser save changed during this action. Open backups to review it; your open board is unchanged.' };
+      setSaveStatus(result);
+      if (result.status !== 'saved') return { error: 'Could not safely save this change. Your open board and shelf are unchanged. Open backups to resolve the save warning or download a copy.' };
+      if (result.recovery) setRecovery(result.recovery);
+      if (action.type === 'load') adoptSave(next);
+      else setSnapshots(next.snapshots);
+      return {};
+    } finally { shelfWriting.current = false; setShelfBusy(false); }
+  }
   async function retrySave() {
     const revision = ++saveRevision.current;
     setSaveStatus({ status: 'saving' });
@@ -212,12 +246,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
     if (result.status !== 'saved') return { error: result.status === 'conflict' ? 'The browser save changed again. Nothing was replaced. Review the latest copy below.' : 'Could not safely store the recovery copy and restored board. Nothing was replaced; download a backup and retry when storage is available.' };
     if (result.recovery) setRecovery(result.recovery);
     if (snapshot.keepLocal) return {};
-    setDesign(next.design); setChapterId(next.chapter); setUnlocked(next.unlocked); setGuided(next.guided);
-    setHistory(next.history); setCertificates(next.certificates); setEdits(emptyEditHistory());
-    setExperimentState(createLinkExperiment()); setHelpSteps({});
-    setSelected('internet'); setSelectedEdge(null); setTrace(null); setScrub(null); setWire(null); setMoveTarget(null);
-    timerState.current = null;
-    setSim({ running: false, paused: false, frames: [], report: null, suite: false });
+    adoptSave(next);
     return {};
   }
 
@@ -229,12 +258,12 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   useEffect(() => {
     const revision = ++saveRevision.current;
     setSaveStatus(previous => previous.status === 'conflict' ? previous : { status: 'saving' });
-    saveSession.write({ version: SAVE_VERSION, design, chapter: chapterId, unlocked, guided, history, certificates }).then(result => {
+    saveSession.write({ version: SAVE_VERSION, design, chapter: chapterId, unlocked, guided, history, certificates, snapshots }).then(result => {
       if (revision !== saveRevision.current) return;
       setSaveStatus(result);
       if (result.status === 'saved' && result.recovery) setRecovery(result.recovery);
     });
-  }, [design, chapterId, unlocked, guided, history, certificates, saveSession]);
+  }, [design, chapterId, unlocked, guided, history, certificates, snapshots, saveSession]);
   useEffect(() => {
     const changed = event => {
       if (event.key !== SAVE_KEY && event.key !== null) return;
@@ -285,7 +314,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   }, [wire, sim.running, design, change]);
   useEffect(() => {
     const key = e => {
-      if (welcome || guide || modelGuide || experimentOpen || backupsOpen || stopConfirm || e.target.isContentEditable || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+      if (welcome || guide || modelGuide || experimentOpen || backupsOpen || stopConfirm || shelfOpen || e.target.isContentEditable || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
       if (e.key === 'Escape') {
         setWire(null); setMoveTarget(null); setTrace(null); setSelectedEdge(null);
         if (navigatorOpen) { setNavigatorOpen(false); navigatorTrigger.current?.focus(); }
@@ -300,7 +329,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
       }
     };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
-  }, [welcome, guide, modelGuide, experimentOpen, backupsOpen, stopConfirm, undo, redo, remove, sim.running, change, design, navigatorOpen, recapOpen]);
+  }, [welcome, guide, modelGuide, experimentOpen, backupsOpen, stopConfirm, shelfOpen, undo, redo, remove, sim.running, change, design, navigatorOpen, recapOpen]);
 
   const advancePlayback = useCallback((keepPaused = false) => {
     const run = timerState.current, event = advancePlaybackRun(run);
@@ -466,7 +495,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
       </aside>
 
       <section className="l1-workspace" onClickCapture={() => { setRecapOpen(false); setNavigatorOpen(false); }}>
-        <div className="l1-board-toolbar"><span><span className="l1-live-dot" />{!sim.running && trace ? 'FOLLOW ONE REQUEST' : mode.label}</span><div><button ref={navigatorTrigger} onClick={() => navigatorOpen ? setNavigatorOpen(false) : openNavigator()} aria-expanded={navigatorOpen} aria-controls="l1-system-navigator">System list</button><button onClick={undo} disabled={!edits.past.length || sim.running} title="Undo · Ctrl Z" aria-label="Undo last edit"><Undo2 size={16} /></button><button onClick={redo} disabled={!edits.future.length || sim.running} title="Redo · Ctrl Shift Z / Ctrl Y" aria-label="Redo last edit"><Redo2 size={16} /></button><button onClick={() => setGuided(g => !g)} className={guided ? 'enabled' : ''} aria-pressed={guided} title="Toggle coach"><BookOpen size={16} /></button></div></div>
+        <div className="l1-board-toolbar"><span><span className="l1-live-dot" />{!sim.running && trace ? 'FOLLOW ONE REQUEST' : mode.label}</span><div><button disabled={sim.running} onClick={() => setShelfOpen(true)} aria-label={`Design shelf · ${snapshots.length} saved`}>Design shelf · {snapshots.length}</button><button ref={navigatorTrigger} onClick={() => navigatorOpen ? setNavigatorOpen(false) : openNavigator()} aria-expanded={navigatorOpen} aria-controls="l1-system-navigator">System list</button><button onClick={undo} disabled={!edits.past.length || sim.running} title="Undo · Ctrl Z" aria-label="Undo last edit"><Undo2 size={16} /></button><button onClick={redo} disabled={!edits.future.length || sim.running} title="Redo · Ctrl Shift Z / Ctrl Y" aria-label="Redo last edit"><Redo2 size={16} /></button><button onClick={() => setGuided(g => !g)} className={guided ? 'enabled' : ''} aria-pressed={guided} title="Toggle coach"><BookOpen size={16} /></button></div></div>
         <div className="l1-board-scroll"><div className={`l1-board ${wire ? 'wiring' : ''} ${moveTarget ? 'placing' : ''}`} ref={board} onClick={placeSelected} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const type = e.dataTransfer.getData('text/plain'); if (!CATALOG[type]) return; const rect = board.current.getBoundingClientRect(); add(type, { x: bounded((e.clientX - rect.left - 69) / size.width * 100, 2, Math.min(80, (size.width - 150) / size.width * 100)), y: bounded((e.clientY - rect.top - 56) / size.height * 100, 8, 75) }); }}>
           <span className="l1-board-label">A SMALL SYSTEM. ROOM TO GROW.</span><div className="l1-legend"><span><i className="l1-dot read" />Read</span><span><i className="l1-dot write" />Write</span><span><i className="l1-dot reply" />Reply</span></div>
           <TrafficLines animated={motion.animated} design={design} metrics={metrics} running={sim.running && !sim.paused} traceStep={traceStep} size={size} />
@@ -551,6 +580,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
     {notice && <div className="l1-notice" role="alert"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss message"><X size={18} /></button></div>}
     {welcome && <Briefing onClose={closeWelcome} />}
     {stopConfirm && <StopRunDialog onClose={closeStopConfirm} onConfirm={confirmStop} sampleCount={sim.frames.length} suite={sim.suite} />}
+    {shelfOpen && <DesignShelfDialog onClose={closeShelf} save={currentSave} busy={shelfBusy} unavailable={saveStatus.status === 'conflict' || saveStatus.status === 'unavailable' || saveStatus.status === 'invalid'} onAction={shelfAction} onBackups={() => { setShelfOpen(false); setBackupsOpen(true); }} />}
     {guide && <Guide type={guide} onClose={closeGuide} />}
     {modelGuide && <ModelGuide onClose={closeModelGuide} />}
     {experimentOpen && <LinkExperimentDialog design={design} state={experimentState} onChange={setExperimentState} onClose={closeExperiment} />}
@@ -559,6 +589,16 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
 }
 
 function RouteIcon() { return <GitFork size={15} />; }
+
+function DesignShelfDialog({ onClose, ...props }) {
+  const ref = useRef(null);
+  useFocusDialog(ref, onClose);
+  return <div className="l1-shade"><section ref={ref} className="l1-dialog l1-model-guide l1-shelf-dialog" role="dialog" aria-modal="true" aria-labelledby="design-shelf-title">
+    <button className="l1-text-button" disabled={props.busy} onClick={onClose} aria-label="Close design shelf"><X size={18} /> Back to your system</button>
+    <h2 id="design-shelf-title">Make room for another idea.</h2>
+    <DesignShelf {...props} />
+  </section></div>;
+}
 
 function StopRunDialog({ onClose, onConfirm, sampleCount, suite }) {
   const ref = useRef(null);

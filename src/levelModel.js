@@ -5,7 +5,8 @@ export const LIMIT = 900;
 export const EFFICIENCY_TARGET = 650;
 // Bump when simulation/validation semantics change, not for presentation-only edits.
 export const MODEL_VERSION = 'admission-v2';
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
+export const MAX_DESIGN_SNAPSHOTS = 8;
 // Keep the existing storage key so an upgrade finds the player's board.
 export const SAVE_KEY = 'system-sandbox:first-level:v2';
 export const CONTRACT_RULES = { maxError: 2, maxLatencyMs: 300, budget: LIMIT };
@@ -213,15 +214,38 @@ export function traceRequest(design, kind = 'read', hot = false) {
   for (let i = chain.length - 2; i >= 0; i--) steps.push({ node: chain[i], from: chain[i + 1], title: i === 0 ? kind === 'read' ? '302 · Redirect delivered' : '201 · Short link created' : 'Return the response', detail: i === 0 ? kind === 'read' ? 'The browser receives the destination. No second reverse wire is needed.' : 'The caller receives a usable short link after the save completes.' : 'The response travels back along the original call.', reply: true });
   return steps;
 }
-export function restoreSave(raw) {
+export function normalizeDesign(value) {
   try {
-    const save = JSON.parse(raw);
-    if (![2, SAVE_VERSION].includes(save?.version) || !Array.isArray(save.design?.nodes) || !Array.isArray(save.design?.edges)) return null;
-    const { nodes, edges } = save.design;
+    if (!Array.isArray(value?.nodes) || !Array.isArray(value?.edges)) return null;
+    const { nodes, edges } = value;
     if (nodes.length > 40 || edges.length > 100 || nodes.filter(n => n.id === 'internet' && n.type === 'internet').length !== 1 || new Set(nodes.map(n => n.id)).size !== nodes.length) return null;
     if (!nodes.every(n => typeof n.id === 'string' && Number.isFinite(n.x) && n.x >= 0 && n.x <= 85 && Number.isFinite(n.y) && n.y >= 0 && n.y <= 82 && (n.type === 'internet' ? n.id === 'internet' : (Object.hasOwn(CATALOG, n.type) && CATALOG[n.type]?.tiers[n.tier]) && Number.isInteger(n.tier)) && (n.type !== 'api' || Object.hasOwn(STRATEGIES, n.strategy || 'sequence')))) return null;
     if (nodes.some(n => !n.id.length || n.id.length > 128 || ['__proto__', 'constructor', 'prototype'].includes(n.id))) return null;
     if (new Set(edges.map(e => e.id)).size !== edges.length || !edges.every(e => typeof e.id === 'string' && e.id.length > 0 && e.id.length <= 256 && nodes.some(n => n.id === e.from) && nodes.some(n => n.id === e.to))) return null;
+    return { nodes: nodes.map(n => ({ id: n.id, type: n.type, x: n.x, y: n.y,
+      ...(Number.isInteger(n.tier) ? { tier: n.tier } : {}), ...(typeof n.strategy === 'string' && Object.hasOwn(STRATEGIES, n.strategy) ? { strategy: n.strategy } : {}) })),
+      edges: edges.map(e => ({ id: e.id, from: e.from, to: e.to })) };
+  } catch { return null; }
+}
+
+export function restoreSave(raw) {
+  try {
+    const save = JSON.parse(raw);
+    if (![2, 3, SAVE_VERSION].includes(save?.version)) return null;
+    const design = normalizeDesign(save.design);
+    if (!design) return null;
+    const rawSnapshots = save.version === SAVE_VERSION && save.snapshots !== undefined ? save.snapshots : [];
+    if (!Array.isArray(rawSnapshots) || rawSnapshots.length > MAX_DESIGN_SNAPSHOTS) return null;
+    const snapshots = rawSnapshots.map(snapshot => {
+      if (!snapshot || typeof snapshot.id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(snapshot.id)
+        || ['__proto__', 'constructor', 'prototype'].includes(snapshot.id)
+        || typeof snapshot.name !== 'string' || !snapshot.name.trim() || snapshot.name.trim().length > 48 || /[\x00-\x1f\x7f]/.test(snapshot.name)) return null;
+      const snapshotDesign = normalizeDesign(snapshot.design);
+      return snapshotDesign ? { id: snapshot.id, name: snapshot.name.trim(), design: snapshotDesign } : null;
+    });
+    // Reject a damaged shelf instead of silently deleting a player's saved experiment.
+    if (snapshots.some(snapshot => !snapshot) || new Set(snapshots.map(s => s.id)).size !== snapshots.length
+      || new Set(snapshots.map(s => s.name.toLowerCase())).size !== snapshots.length) return null;
     const unlocked = Math.max(0, Math.min(2, Math.floor(Number(save.unlocked) || 0)));
     const normalize = r => {
       if (!r || !Number.isInteger(r.chapter) || !CHAPTERS[r.chapter] || typeof r.passed !== 'boolean'
@@ -238,13 +262,10 @@ export function restoreSave(raw) {
     };
     const allHistory = (Array.isArray(save.history) ? save.history : []).map(normalize).filter(Boolean);
     const history = allHistory.slice(-12);
-    // Only v2 needs history migration. v3's durable ledger is independent of recent attempts.
+    // Only v2 needs history migration. Later durable ledgers are independent of recent attempts.
     const candidates = save.version === 2 ? allHistory : (Array.isArray(save.certificates) ? save.certificates : []).map(normalize).filter(Boolean);
     const certificates = candidates.reduce(recordCertificate, []);
-    const design = { nodes: nodes.map(n => ({ id: n.id, type: n.type, x: n.x, y: n.y,
-      ...(Number.isInteger(n.tier) ? { tier: n.tier } : {}), ...(typeof n.strategy === 'string' && Object.hasOwn(STRATEGIES, n.strategy) ? { strategy: n.strategy } : {}) })),
-      edges: edges.map(e => ({ id: e.id, from: e.from, to: e.to })) };
-    return { version: SAVE_VERSION, design, unlocked,
+    return { version: SAVE_VERSION, design, snapshots, unlocked,
       chapter: Math.max(0, Math.min(unlocked, Math.floor(Number(save.chapter) || 0))), guided: save.guided !== false, history, certificates };
   } catch { return null; }
 }

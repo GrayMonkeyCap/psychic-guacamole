@@ -18,7 +18,7 @@ export default function SaveBackups({ save, recovery, onRestore, restoreDisabled
       const url = URL.createObjectURL(new Blob([encodeBackup(value)], { type: 'application/json' }));
       const link = document.createElement('a'); link.href = url; link.download = recoveryCopy ? 'system-sandbox-level-1-recovery.json' : 'system-sandbox-level-1.json'; link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setMessage('Backup download started. It includes your board and earned passes, not experiment URLs or traffic recordings.');
+      setMessage('Backup download started. It includes your board, design shelf and earned passes, not experiment URLs or traffic recordings.');
     } catch (error) { setMessage(error.message); }
   }
   async function pickFile(e) {
@@ -32,12 +32,12 @@ export default function SaveBackups({ save, recovery, onRestore, restoreDisabled
     } catch { setMessage('The file could not be read. Nothing changed.'); }
   }
   return <section className="l1-backups" aria-label="Portable saves">
-    <p>Download a copy of your board and earned passes. Files stay on your device; no account or upload is involved.</p>
+    <p>Download a copy of your board, design shelf and earned passes. Files stay on your device; no account or upload is involved.</p>
     <button className="l1-primary" onClick={() => download()}>Download current save</button>
     <label>Choose a Level 1 backup<input type="file" disabled={restoring} accept=".json,application/json" onChange={pickFile} /></label>
     {recovery && <button className="l1-secondary" disabled={restoring} onClick={() => { setPending(recovery); setMessage('Review the last saved recovery checkpoint.'); }}>Review recovery copy</button>}
     {recovery && <button className="l1-text-button" onClick={() => download(recovery, true)}>Download recovery copy</button>}
     <p role="status">{message}</p>
-    {pending && <div className="l1-backup-preview"><h3>Backup preview</h3><p>{pending.design.nodes.length - 1} components · {pending.design.edges.length} connections · ${costOf(pending.design.nodes)}/month</p><p>{passedChapters(pending.certificates, pending.design).filter(Boolean).length} / 3 challenges passed under current rules. Older certificates remain recorded.</p><p>Restoring replaces this board and clears the current recording and unsaved link experiment. A recovery copy of the current board is kept first. Download it above if you also want a separate file.</p><button className="l1-primary" disabled={restoreDisabled || restoring} onClick={restore}>{restoring ? 'Saving safely…' : 'Restore this backup'}</button><button className="l1-text-button" disabled={restoring} onClick={() => { setPending(null); setMessage('Restore cancelled. Your board is unchanged.'); }}>Keep current board</button></div>}
+    {pending && <div className="l1-backup-preview"><h3>Backup preview</h3><p>{pending.design.nodes.length - 1} components · {pending.design.edges.length} connections · ${costOf(pending.design.nodes)}/month</p><p>{passedChapters(pending.certificates, pending.design).filter(Boolean).length} / 3 challenges passed under current rules. Older certificates remain recorded.</p><p>Design shelf: {pending.snapshots?.length || 0} snapshots{pending.snapshots?.length ? ` · ${pending.snapshots.map(snapshot => snapshot.name).join(' · ')}` : ' · empty'}.</p><p>Restoring replaces this board and its design shelf, and clears the current recording and unsaved link experiment. A recovery copy of the current board and shelf is kept first. Download it above if you also want a separate file.</p><button className="l1-primary" disabled={restoreDisabled || restoring} onClick={restore}>{restoring ? 'Saving safely…' : 'Restore this backup'}</button><button className="l1-text-button" disabled={restoring} onClick={() => { setPending(null); setMessage('Restore cancelled. Your board is unchanged.'); }}>Keep current board</button></div>}
   </section>;
 }
