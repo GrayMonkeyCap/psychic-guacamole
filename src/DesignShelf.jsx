@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { costOf, MAX_DESIGN_SNAPSHOTS, passedChapters } from './levelModel.js';
 import { sameDesign } from './editorHistory.js';
+import DesignComparison from './DesignComparison.jsx';
 
 export default function DesignShelf({ save, onAction, busy, unavailable, onBackups }) {
   const [name, setName] = useState(''), [pending, setPending] = useState(null), [message, setMessage] = useState('');
+  const [comparing, setComparing] = useState(false), compareTrigger = useRef(null);
   const confirmation = useRef(null), nameInput = useRef(null);
   useEffect(() => { if (pending) confirmation.current?.focus(); }, [pending]);
   const snapshots = save.snapshots || [];
@@ -18,9 +20,11 @@ export default function DesignShelf({ save, onAction, busy, unavailable, onBacku
       requestAnimationFrame(() => nameInput.current?.focus());
     }
   }
+  if (comparing) return <DesignComparison design={save.design} snapshots={snapshots} onClose={() => { setComparing(false); requestAnimationFrame(() => compareTrigger.current?.focus()); }} />;
   return <section className="l1-design-shelf" aria-label="Named design snapshots">
     <p>Keep a working idea before changing it. Snapshots never change as you edit. Loading opens a working copy and keeps your current board on this shelf first.</p>
     <p>{snapshots.length} / {MAX_DESIGN_SNAPSHOTS} snapshots · device-local. Backups include the shelf. Traffic recordings and mapping-experiment URLs are not included.</p>
+    <button ref={compareTrigger} className="l1-guide-button" disabled={busy || !snapshots.length} onClick={() => { setPending(null); setComparing(true); }}>Compare designs</button>
     {unavailable && <p role="alert">Resolve the save warning or restore safe storage before changing the shelf. You can still download your current save.</p>}
     <form onSubmit={event => { event.preventDefault(); act({ type: 'save', name }); }}>
       <label htmlFor="snapshot-name">Name this design<input ref={nameInput} id="snapshot-name" value={name} maxLength={48} onChange={event => setName(event.target.value)} disabled={busy} placeholder="For example: my first working link" /></label>
