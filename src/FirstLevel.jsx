@@ -17,6 +17,7 @@ import SaveConflict from './SaveConflict.jsx';
 import ComponentContract from './ComponentContract.jsx';
 import ComponentAdvice from './ComponentAdvice.jsx';
 import LearningResources from './LearningResources.jsx';
+import WorkloadLab from './WorkloadLab.jsx';
 import CompletionRecap from './CompletionRecap.jsx';
 import CapacityPicker from './CapacityPicker.jsx';
 import StructureReview, { LocalStructureIssues } from './StructureReview.jsx';
@@ -45,7 +46,7 @@ function useFocusDialog(ref, close) {
     const key = e => {
       if (e.key === 'Escape') close();
       if (e.key !== 'Tab') return;
-      const targets = [...(ref.current?.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary') || [])].filter(target => target.checkVisibility() && getComputedStyle(target).visibility === 'visible' && !target.closest('[inert]'));
+      const targets = [...(ref.current?.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex="-1"])') || [])].filter(target => target.checkVisibility() && getComputedStyle(target).visibility === 'visible' && !target.closest('[inert]'));
       if (!targets?.length) { e.preventDefault(); return; }
       if (e.shiftKey && document.activeElement === targets[0]) { e.preventDefault(); targets[targets.length - 1].focus(); }
       else if (!e.shiftKey && document.activeElement === targets[targets.length - 1]) { e.preventDefault(); targets[0].focus(); }
@@ -149,6 +150,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const [welcome, setWelcome] = useState(forceTutorial || !saved);
   const [guide, setGuide] = useState(null);
   const [choicesOpen, setChoicesOpen] = useState(false);
+  const [workloadOpen, setWorkloadOpen] = useState(false);
   const [modelGuide, setModelGuide] = useState(false);
   const [experimentOpen, setExperimentOpen] = useState(false);
   const [experimentState, setExperimentState] = useState(createLinkExperiment);
@@ -198,6 +200,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const closeWelcome = useCallback(() => setWelcome(false), []);
   const closeGuide = useCallback(() => setGuide(null), []);
   const closeChoices = useCallback(() => setChoicesOpen(false), []);
+  const closeWorkload = useCallback(() => setWorkloadOpen(false), []);
   const closeModelGuide = useCallback(() => setModelGuide(false), []);
   const closeExperiment = useCallback(() => setExperimentOpen(false), []);
   const closeBackups = useCallback(() => setBackupsOpen(false), []);
@@ -319,7 +322,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   }, [wire, sim.running, design, change]);
   useEffect(() => {
     const key = e => {
-      if (welcome || guide || choicesOpen || modelGuide || experimentOpen || backupsOpen || stopConfirm || shelfOpen || e.target.isContentEditable || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+      if (welcome || guide || choicesOpen || workloadOpen || modelGuide || experimentOpen || backupsOpen || stopConfirm || shelfOpen || e.target.isContentEditable || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
       if (e.key === 'Escape') {
         setWire(null); setMoveTarget(null); setTrace(null); setSelectedEdge(null);
         if (navigatorOpen) { setNavigatorOpen(false); navigatorTrigger.current?.focus(); }
@@ -334,7 +337,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
       }
     };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
-  }, [welcome, guide, choicesOpen, modelGuide, experimentOpen, backupsOpen, stopConfirm, shelfOpen, undo, redo, remove, sim.running, change, design, navigatorOpen, recapOpen]);
+  }, [welcome, guide, choicesOpen, workloadOpen, modelGuide, experimentOpen, backupsOpen, stopConfirm, shelfOpen, undo, redo, remove, sim.running, change, design, navigatorOpen, recapOpen]);
 
   const advancePlayback = useCallback((keepPaused = false) => {
     const run = timerState.current, event = advancePlaybackRun(run);
@@ -487,7 +490,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
         <p>{chapter.brief}</p>
         <div className="l1-link-example"><small>BAKERY.EXAMPLE/MENU</small><ArrowRight size={13} /><strong>lnk / bakery</strong></div>
         <div className="l1-contract"><small>YOUR SYSTEM MUST</small>{['Answer the request', 'Remember the mapping', 'Create a unique code'].map((label, i) => <div key={label} className={validation.capabilities[i] ? 'complete' : ''}><span>{validation.capabilities[i] ? <Check size={12} /> : i + 1}</span>{label}</div>)}</div>
-        <div className="l1-forecast"><small>TRAFFIC FORECAST</small><div><strong>{round(chapter.peak)}</strong><span>requests / sec</span></div><div className="l1-mix"><i style={{ width: `${chapter.reads * 100}%` }} /></div><span><i className="l1-dot read" />{Math.round(chapter.reads * 100)}% redirects <i className="l1-dot write" />{Math.round((1 - chapter.reads) * 100)}% creations</span>{chapterId === 1 && <b>92% of reads visit one hot link.</b>}</div>
+        <div className="l1-forecast"><small>TRAFFIC FORECAST</small><div><strong>{round(chapter.peak)}</strong><span>requests / sec</span></div><div className="l1-mix"><i style={{ width: `${chapter.reads * 100}%` }} /></div><span><i className="l1-dot read" />{Math.round(chapter.reads * 100)}% redirects <i className="l1-dot write" />{Math.round((1 - chapter.reads) * 100)}% creations</span><p>At peak: {round(chapter.peak * chapter.reads)} opens + {round(chapter.peak * (1 - chapter.reads))} new links each second.</p>{chapterId === 1 && <b>92% of reads visit one hot link.</b>}<button className="l1-text-button l1-workload-trigger" disabled={sim.running && !sim.paused} onClick={() => setWorkloadOpen(true)}>Explore traffic mix <FlaskConical size={15} /></button></div>
         <div className="l1-rules"><span>Success / sample <b>≥ {100 - CONTRACT_RULES.maxError}%</b></span><span>Est. latency <b>≤ {CONTRACT_RULES.maxLatencyMs} ms</b></span><span>Monthly cost <b>≤ ${LIMIT}</b></span></div>
         <StructureReview design={design} validation={validation} onInspect={inspectIssue} />
         <button className="l1-text-button" onClick={() => setModelGuide(true)}><FlaskConical size={15} /> How tests are measured</button>
@@ -590,6 +593,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
     {shelfOpen && <DesignShelfDialog onClose={closeShelf} save={currentSave} busy={shelfBusy} unavailable={saveStatus.status === 'conflict' || saveStatus.status === 'unavailable' || saveStatus.status === 'invalid'} onAction={shelfAction} onBackups={() => { setShelfOpen(false); setBackupsOpen(true); }} />}
     {guide && <Guide type={guide} onClose={closeGuide} />}
     {choicesOpen && <ComponentChoices design={design} chapter={chapter} frame={metrics} disabled={sim.running} onClose={closeChoices} onAdd={type => { add(type); closeChoices(); }} />}
+    {workloadOpen && <WorkloadDialog design={design} initialPeak={chapter.peak} onClose={closeWorkload} />}
     {modelGuide && <ModelGuide onClose={closeModelGuide} />}
     {experimentOpen && <LinkExperimentDialog design={design} state={experimentState} onChange={setExperimentState} onClose={closeExperiment} />}
     {backupsOpen && <BackupsDialog onClose={closeBackups} save={currentSave} recovery={recovery} onRestore={restoreBackup} restoreDisabled={savingRestore || saveStatus.status === 'conflict'} conflict={saveStatus.status === 'conflict' ? <SaveConflict snapshot={saveStatus} currentSave={currentSave} busy={savingRestore} onResolve={restoreBackup} /> : null} />}
@@ -633,6 +637,17 @@ function LinkExperimentDialog({ onClose, ...props }) {
     <button className="l1-text-button" onClick={onClose} aria-label="Close link experiment"><X size={18} /> Back to your system</button>
     <h2 id="link-lab-title">Where does your link live?</h2>
     <LinkExperiment {...props} />
+  </section></div>;
+}
+
+function WorkloadDialog({ onClose, ...props }) {
+  const ref = useRef(null);
+  useFocusDialog(ref, onClose);
+  return <div className="l1-shade"><section ref={ref} className="l1-dialog l1-workload-dialog" role="dialog" aria-modal="true" aria-labelledby="workload-title">
+    <button className="l1-text-button" onClick={onClose}>Back to your traffic</button>
+    <h2 id="workload-title">Equal traffic. Different work.</h2>
+    <strong className="l1-workload-label">OPTIONAL EXPERIMENT · UNGRADED</strong>
+    <WorkloadLab {...props} />
   </section></div>;
 }
 

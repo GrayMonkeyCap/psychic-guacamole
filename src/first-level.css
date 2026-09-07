@@ -15,6 +15,23 @@
 .l1-choice-options button[aria-pressed="true"] { border-color: #35564e; background: #dce9d6; }
 .l1-choice-options strong, .l1-choice-options span { display: block; font-size: 13px; }
 .l1-choice-options span { margin-top: 5px; font-size: 12px; }
+.l1-shell .l1-workload-dialog { width: 860px; }
+.l1-workload-label { font-size: 12px; color: #35564e; }
+.l1-shell .l1-workload-lab p { font-size: 13px; line-height: 1.65; color: #35564e; }
+.l1-shell .l1-workload-lab h3 { font-size: 15px; line-height: 1.5; color: #35564e; }
+.l1-workload-lab label { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 20px; color: #35564e; font-weight: 800; }
+.l1-workload-lab select { min-height: 44px; max-width: 100%; padding: 8px; border: 1px solid #8ba68c; border-radius: 8px; background: #fff9e9; color: #35564e; }
+.l1-workload-shapes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 20px 0; }
+.l1-workload-shapes article { border: 1px solid #c8c6ab; background: #f0efda; border-radius: 12px; padding: 12px; }
+.l1-workload-shapes small { color: #35564e; font-size: 12px; }
+.l1-workload-table { overflow-x: auto; border: 1px solid #c8c6ab; border-radius: 10px; margin: 16px 0; }
+.l1-workload-table table { border-collapse: collapse; width: 100%; min-width: 600px; color: #35564e; font-size: 12px; line-height: 1.6; }
+.l1-workload-table caption { padding: 12px; text-align: left; font-weight: 800; }
+.l1-workload-table th, .l1-workload-table td { border-top: 1px solid #c8c6ab; padding: 12px 9px; text-align: right; }
+.l1-workload-table th:first-child { text-align: left; }
+.l1-workload-table small { display: block; font-size: 11px; font-weight: 500; }
+.l1-shell .l1-workload-trigger { color: #35564e; min-height: 44px; font-size: 12px; text-decoration: underline; }
+@media (max-width: 650px) { .l1-workload-shapes { grid-template-columns: 1fr; } }
 .l1-workbench-heading .l1-choice-trigger { background: #dce9d6; color: #35564e; border: 1px solid #8ba68c; border-radius: 8px; padding: 7px 10px; min-height: 34px; font-size: 12px; font-weight: 800; text-decoration: none; }
 @media (max-width: 420px) { .l1-choice-options { grid-template-columns: 1fr; } }
 .l1-shell:has(.l1-postmortem) { min-height: 940px; }
