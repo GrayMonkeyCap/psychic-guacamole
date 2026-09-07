@@ -1,4 +1,22 @@
 .l1-shell { --ink: #2e4e51; --muted: #6d827c; --paper: #fff9e9; --stroke: #d8cdb6; --read: #287e9c; --write: #c9763f; height: 100dvh; min-height: 820px; grid-template-rows: 88px minmax(0, 1fr) auto auto; color: var(--ink); background: #b7d8c7; }
+.l1-choice-advice, .l1-learning-resources { margin: 14px 0; padding: 12px; border: 1px solid #c8c6ab; border-radius: 12px; background: #f0efda; color: #35564e; font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.l1-choice-advice h3 { margin: 0 0 8px; font-size: 14px; }
+.l1-choice-advice p, .l1-learning-resources p { font-size: 12px; line-height: 1.55; color: #35564e; }
+.l1-shell .l1-choice-advice p, .l1-shell .l1-learning-resources p, .l1-shell .l1-choices-dialog > p { color: #35564e; }
+.l1-shell .l1-choices-dialog > p { font-size: 14px; line-height: 1.55; }
+.l1-choice-advice summary, .l1-learning-resources summary { cursor: pointer; font-weight: 800; padding-block: 5px; }
+.l1-choice-evidence { border-left: 3px solid #6d8871; padding-left: 9px; }
+.l1-learning-resources ul { padding-left: 16px; }
+.l1-learning-resources li + li { margin-top: 14px; }
+.l1-learning-resources a { color: #245b74; text-decoration: underline; text-underline-offset: 3px; font-weight: 800; }
+.l1-choices-dialog { width: 660px !important; }
+.l1-choice-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.l1-choice-options button { text-align: left; padding: 12px; border: 2px solid #c9c4aa; border-radius: 12px; background: #fff9e9; color: #35564e; }
+.l1-choice-options button[aria-pressed="true"] { border-color: #35564e; background: #dce9d6; }
+.l1-choice-options strong, .l1-choice-options span { display: block; font-size: 13px; }
+.l1-choice-options span { margin-top: 5px; font-size: 12px; }
+.l1-workbench-heading .l1-choice-trigger { background: #dce9d6; color: #35564e; border: 1px solid #8ba68c; border-radius: 8px; padding: 7px 10px; min-height: 34px; font-size: 12px; font-weight: 800; text-decoration: none; }
+@media (max-width: 420px) { .l1-choice-options { grid-template-columns: 1fr; } }
 .l1-shell:has(.l1-postmortem) { min-height: 940px; }
 .l1-shell button { cursor: pointer; }
 .l1-shell button:disabled { opacity: .45; cursor: not-allowed; }

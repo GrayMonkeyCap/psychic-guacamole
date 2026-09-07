@@ -1,3 +1,5 @@
+/* The campaign owns document scrolling; the legacy game body lock must not clip it. */
+body:has(.hub-shell) { height: auto; min-height: 100dvh; overflow-x: hidden; overflow-y: auto; }
 .hub-shell { --hub-ink: #35564e; --hub-muted: #788775; --hub-paper: #fff8e7; --hub-line: #d7cbb0; color: var(--hub-ink); background: #c5dcc7; min-height: 100vh; font-family: 'Manrope', system-ui, sans-serif; }
 .hub-shell button, .hub-shell a { -webkit-tap-highlight-color: transparent; }
 .hub-shell button { cursor: pointer; }

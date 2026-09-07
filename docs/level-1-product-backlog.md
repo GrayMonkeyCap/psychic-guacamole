@@ -6,6 +6,20 @@
 
 ## 1. The product we are trying to make
 
+### Player feedback fast lane · 7 September 2026
+
+Priority override requested by the owner: complete these before the next planned feature. Feedback: landing page cannot scroll; make component options and their reasons obvious; connect game settings to deeper AWS/GCP learning.
+
+| ID | Priority / status | Acceptance |
+| --- | --- | --- |
+| FB-001 | P0 · Implemented | Campaign document scrolling overrides the legacy body lock. Wheel and keyboard-to-footer checks cover returning from Level 1 and desktop/compact widths; the game keeps independent panel/board scrolling. |
+| FB-002 | P1 · Implemented | **Help me choose** previews all six jobs before placement. Inspector reasons follow the board, allocation strategy and forecast, with separate selected-sample evidence. Alternatives stay optional; no automatic wiring, placement or compulsory topology. Placement is undoable and locked during active/paused runs. |
+| FB-003 | P1 · Implemented | Optional official cloud configuration links in chooser, inspector and field guide. Descriptive new-tab links, no deployment/embeds and explicit model limits. Allocation links teach PostgreSQL semantics instead of inventing a mandatory provider service. |
+
+Follow-up: revisit these changes with the feedback author and target novices (L1-057/063). Automated checks establish functionality, not improved learning. No additional playable levels are authorized by this feedback.
+
+Implementation and source ledger: [player feedback notes](player-feedback-2026-09-07.md). Verification: 170 unit/component tests, production build and all 22 browser regression scripts pass. No model rules or save schema changed.
+
 > Build systems. Send traffic. Watch them break. Learn why.
 
 The strongest version of this idea is an understandable, manipulable system: a player makes a hypothesis, builds something, sees consequences, changes their mind, and wants another attempt. A pretty diagram that turns green is not enough. Neither is a textbook interrupted by wiring exercises.

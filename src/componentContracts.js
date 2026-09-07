@@ -46,6 +46,10 @@ const contracts = {
   },
 };
 
+export function componentResponsibilities(type) {
+  return contracts[type] ? { ...contracts[type] } : null;
+}
+
 export function componentContract(design, id) {
   const node = design.nodes.find(n => n.id === id), facts = contracts[node?.type];
   if (!facts) return null;

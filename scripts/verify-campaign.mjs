@@ -17,6 +17,24 @@ const errors = [];
 page.on('pageerror', e => errors.push(e.message));
 await page.goto(`${TEST_URL}/`);
 await page.getByRole('button', { name: 'Play your first level' }).waitFor();
+async function checkNaturalScroll(label) {
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press('Control+Home');
+  await page.waitForFunction(() => window.scrollY === 0);
+  // Let native keyboard scrolling and resized compositor hit regions settle before a new gesture.
+  await page.waitForTimeout(200);
+  await page.mouse.move(Math.min(600, page.viewportSize().width / 2), 400);
+  await page.mouse.wheel(0, 650);
+  await page.waitForFunction(() => window.scrollY > 100, null, { timeout: 3000 }).catch(async error => {
+    console.error(label, await page.evaluate(() => ({ y: scrollY, width: innerWidth, body: [document.body.scrollTop, document.body.scrollHeight, document.body.clientHeight, getComputedStyle(document.body).overflow], root: [document.documentElement.scrollHeight, document.documentElement.clientHeight], hit: document.elementFromPoint(innerWidth / 2, 400)?.outerHTML.slice(0, 250) })));
+    throw error;
+  });
+  await page.keyboard.press('Control+End');
+  await page.waitForFunction(() => document.querySelector('.hub-footer').getBoundingClientRect().bottom <= innerHeight + 2);
+  assert.ok(await page.evaluate(() => window.scrollY > 0), `${label}: footer reachable with keyboard`);
+  await page.keyboard.press('Control+Home');
+}
+await checkNaturalScroll('new desktop player');
 assert.equal(await page.getByText('LOCKED', { exact: true }).count(), 0);
 await page.screenshot({ path: path.join(artifactDir, 'campaign-new-desktop.png'), fullPage: true });
 await page.getByRole('link', { name: 'Show me how', exact: true }).click();
@@ -26,6 +44,7 @@ await page.getByRole('button', { name: 'Let’s build a link' }).click();
 await page.getByRole('button', { name: 'Add API server', exact: true }).click();
 await page.getByRole('button', { name: 'SYSTEM SANDBOX / 01 The little link' }).click();
 await page.getByRole('button', { name: 'Continue building', exact: true }).waitFor();
+await checkNaturalScroll('return from level');
 assert.ok((await page.locator('.hub-play-note').innerText()).includes('1 component'));
 await page.getByRole('button', { name: 'Revisit the introduction' }).click();
 await page.getByRole('button', { name: 'Let’s build a link' }).click();
@@ -44,6 +63,7 @@ assert.ok((await page.locator('.hub-save-stats').innerText()).includes('$540'));
 await page.screenshot({ path: path.join(artifactDir, 'campaign-returning-desktop.png'), fullPage: true });
 for (const width of [1024, 768, 390, 320]) {
   await page.setViewportSize({ width, height: 900 });
+  await checkNaturalScroll(`${width}px campaign`);
   await page.screenshot({ path: path.join(artifactDir, `campaign-${width}.png`), fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `no overflow at ${width}px`);
 }

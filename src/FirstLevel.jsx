@@ -15,6 +15,8 @@ import { readStoredProgress, RECOVERY_KEY } from './saveBackups.js';
 import { createSaveSession, SAVE_LOCK } from './saveSession.js';
 import SaveConflict from './SaveConflict.jsx';
 import ComponentContract from './ComponentContract.jsx';
+import ComponentAdvice from './ComponentAdvice.jsx';
+import LearningResources from './LearningResources.jsx';
 import CompletionRecap from './CompletionRecap.jsx';
 import CapacityPicker from './CapacityPicker.jsx';
 import StructureReview, { LocalStructureIssues } from './StructureReview.jsx';
@@ -43,7 +45,7 @@ function useFocusDialog(ref, close) {
     const key = e => {
       if (e.key === 'Escape') close();
       if (e.key !== 'Tab') return;
-      const targets = ref.current?.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled)');
+      const targets = [...(ref.current?.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary') || [])].filter(target => target.checkVisibility() && getComputedStyle(target).visibility === 'visible' && !target.closest('[inert]'));
       if (!targets?.length) { e.preventDefault(); return; }
       if (e.shiftKey && document.activeElement === targets[0]) { e.preventDefault(); targets[targets.length - 1].focus(); }
       else if (!e.shiftKey && document.activeElement === targets[targets.length - 1]) { e.preventDefault(); targets[0].focus(); }
@@ -76,6 +78,7 @@ function Guide({ type, onClose }) {
     <div className="l1-guide-flow">{type === 'cache' ? 'API → cache → API → database on a miss' : type === 'database' ? 'short code → stored mapping → destination' : type === 'idGenerator' ? 'API → allocate code → API → save mapping' : type === 'loadBalancer' ? 'one stream → balanced requests → API replicas' : type === 'cdn' ? 'visitor → edge hit, or forward to origin' : 'request → application logic → response'}</div>
     <h3>What changes in your system?</h3><p>{config.lesson}</p>
     <div className="l1-callout"><BookOpen size={18} /><span>{config.caution}</span></div>
+    <LearningResources type={type} />
     <button className="l1-primary" onClick={onClose}>Back to the board <ArrowRight size={17} /></button>
   </section></div>;
 }
@@ -145,6 +148,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const [guided, setGuided] = useState(forceTutorial || saved?.guided !== false);
   const [welcome, setWelcome] = useState(forceTutorial || !saved);
   const [guide, setGuide] = useState(null);
+  const [choicesOpen, setChoicesOpen] = useState(false);
   const [modelGuide, setModelGuide] = useState(false);
   const [experimentOpen, setExperimentOpen] = useState(false);
   const [experimentState, setExperimentState] = useState(createLinkExperiment);
@@ -193,6 +197,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   const outdatedResults = certificates.some(c => !isCurrentResult(c));
   const closeWelcome = useCallback(() => setWelcome(false), []);
   const closeGuide = useCallback(() => setGuide(null), []);
+  const closeChoices = useCallback(() => setChoicesOpen(false), []);
   const closeModelGuide = useCallback(() => setModelGuide(false), []);
   const closeExperiment = useCallback(() => setExperimentOpen(false), []);
   const closeBackups = useCallback(() => setBackupsOpen(false), []);
@@ -314,7 +319,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
   }, [wire, sim.running, design, change]);
   useEffect(() => {
     const key = e => {
-      if (welcome || guide || modelGuide || experimentOpen || backupsOpen || stopConfirm || shelfOpen || e.target.isContentEditable || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+      if (welcome || guide || choicesOpen || modelGuide || experimentOpen || backupsOpen || stopConfirm || shelfOpen || e.target.isContentEditable || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
       if (e.key === 'Escape') {
         setWire(null); setMoveTarget(null); setTrace(null); setSelectedEdge(null);
         if (navigatorOpen) { setNavigatorOpen(false); navigatorTrigger.current?.focus(); }
@@ -329,7 +334,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
       }
     };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
-  }, [welcome, guide, modelGuide, experimentOpen, backupsOpen, stopConfirm, shelfOpen, undo, redo, remove, sim.running, change, design, navigatorOpen, recapOpen]);
+  }, [welcome, guide, choicesOpen, modelGuide, experimentOpen, backupsOpen, stopConfirm, shelfOpen, undo, redo, remove, sim.running, change, design, navigatorOpen, recapOpen]);
 
   const advancePlayback = useCallback((keepPaused = false) => {
     const run = timerState.current, event = advancePlaybackRun(run);
@@ -522,7 +527,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
           {trace && <div className="l1-trace-caption"><b>{trace.index + 1} / {trace.steps.length}</b><span>{traceStep.title}</span><button disabled={trace.index === trace.steps.length - 1} onClick={() => setTrace(t => ({ ...t, index: t.index + 1 }))}>Next <ArrowRight size={15} /></button></div>}
         </div></div>
 
-        <div className="l1-workbench"><div className="l1-workbench-heading"><span>COMPONENT WORKBENCH</span><button onClick={() => setAllTools(v => !v)}>{allTools ? 'Focus tools' : 'Show all tools'}</button></div><div className="l1-tools">{Object.entries(CATALOG).filter(([type]) => allTools || ['api', 'database'].includes(type) || chapterId >= 1 && ['cache', 'loadBalancer', 'cdn'].includes(type) || chapterId >= 2).map(([type, config]) => {
+        <div className="l1-workbench"><div className="l1-workbench-heading"><span>COMPONENT WORKBENCH</span><button className="l1-choice-trigger" onClick={() => setChoicesOpen(true)}>Help me choose</button><button onClick={() => setAllTools(v => !v)}>{allTools ? 'Focus tools' : 'Show all tools'}</button></div><div className="l1-tools">{Object.entries(CATALOG).filter(([type]) => allTools || ['api', 'database'].includes(type) || chapterId >= 1 && ['cache', 'loadBalancer', 'cdn'].includes(type) || chapterId >= 2).map(([type, config]) => {
           const Icon = ICONS[type];
           return <button key={type} draggable={!sim.running} disabled={sim.running} onDragStart={e => e.dataTransfer.setData('text/plain', type)} onClick={() => add(type)} aria-label={`Add ${config.name}`} style={{ '--component': config.color }}><span><Icon size={23} /><Plus size={12} /></span><strong>{config.short}</strong><small>${config.tiers[0].cost}/mo</small></button>;
         })}</div></div>
@@ -541,6 +546,8 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
           const config = CATALOG[node.type], Icon = ICONS[node.type], load = metrics?.loads[node.id];
           return <><div className="l1-inspector-heading"><span className="l1-inspector-icon" style={{ background: config.color }}><Icon size={24} /></span><div><h2>{componentLabel(design, node.id)}</h2><small>{config.verb}</small></div></div><p>{config.role}</p>
             <ComponentContract design={design} node={node} />
+            <ComponentAdvice design={design} node={node} type={node.type} chapter={chapter} frame={metrics} />
+            <LearningResources type={node.type} />
             <button className="l1-guide-button" onClick={() => setGuide(node.type)}><BookOpen size={15} /> How this component works <ChevronRight size={14} /></button>
             <button className="l1-guide-button" disabled={sim.running} onClick={() => { setMoveTarget(node.id); setWire(null); }}><MousePointer2 size={15} /> Move without dragging</button>
             <CapacityPicker key={`${node.id}:${node.tier}`} design={design} node={node} disabled={sim.running} onApply={tier => edit({ tier })} />
@@ -582,6 +589,7 @@ export default function FirstLevel({ onExit, onLevelResult, forceTutorial = fals
     {stopConfirm && <StopRunDialog onClose={closeStopConfirm} onConfirm={confirmStop} sampleCount={sim.frames.length} suite={sim.suite} />}
     {shelfOpen && <DesignShelfDialog onClose={closeShelf} save={currentSave} busy={shelfBusy} unavailable={saveStatus.status === 'conflict' || saveStatus.status === 'unavailable' || saveStatus.status === 'invalid'} onAction={shelfAction} onBackups={() => { setShelfOpen(false); setBackupsOpen(true); }} />}
     {guide && <Guide type={guide} onClose={closeGuide} />}
+    {choicesOpen && <ComponentChoices design={design} chapter={chapter} frame={metrics} disabled={sim.running} onClose={closeChoices} onAdd={type => { add(type); closeChoices(); }} />}
     {modelGuide && <ModelGuide onClose={closeModelGuide} />}
     {experimentOpen && <LinkExperimentDialog design={design} state={experimentState} onChange={setExperimentState} onClose={closeExperiment} />}
     {backupsOpen && <BackupsDialog onClose={closeBackups} save={currentSave} recovery={recovery} onRestore={restoreBackup} restoreDisabled={savingRestore || saveStatus.status === 'conflict'} conflict={saveStatus.status === 'conflict' ? <SaveConflict snapshot={saveStatus} currentSave={currentSave} busy={savingRestore} onResolve={restoreBackup} /> : null} />}
@@ -625,6 +633,24 @@ function LinkExperimentDialog({ onClose, ...props }) {
     <button className="l1-text-button" onClick={onClose} aria-label="Close link experiment"><X size={18} /> Back to your system</button>
     <h2 id="link-lab-title">Where does your link live?</h2>
     <LinkExperiment {...props} />
+  </section></div>;
+}
+
+function ComponentChoices({ design, chapter, frame, disabled, onClose, onAdd }) {
+  const ref = useRef(null), [type, setType] = useState('api');
+  useFocusDialog(ref, onClose);
+  const config = CATALOG[type];
+  return <div className="l1-shade"><section ref={ref} className="l1-dialog l1-choices-dialog" role="dialog" aria-modal="true" aria-labelledby="choices-title">
+    <button className="l1-text-button" onClick={onClose}>Back to building</button>
+    <h2 id="choices-title">What job needs doing?</h2>
+    <p>Explore a choice before placing it. There is no required shopping list: keep what earns its place.</p>
+    <div className="l1-choice-options" aria-label="Explore components">{Object.entries(CATALOG).map(([key, item]) => <button key={key} aria-pressed={type === key} onClick={() => setType(key)}><strong>{item.name}</strong><span>{item.verb}</span></button>)}</div>
+    <h3>{config.name}</h3><p>{config.role}</p>
+    <ComponentAdvice design={design} type={type} chapter={chapter} frame={frame} />
+    <p>Small starts at ${config.tiers[0].cost}/mo in game units. Place it, connect it yourself, then test your idea. Undo is available.</p>
+    <button className="l1-primary" disabled={disabled} onClick={() => onAdd(type)}>Place {config.name}</button>
+    {disabled && <p>Finish or end this run before changing the board. Pausing keeps editing locked.</p>}
+    <LearningResources type={type} />
   </section></div>;
 }
 
